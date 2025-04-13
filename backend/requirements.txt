@@ -1,0 +1,13 @@
+fastapi==0.68.1
+uvicorn==0.15.0
+pydantic==1.8.2
+python-dotenv==0.19.0
+requests==2.26.0
+pytest==6.2.5
+httpx==0.19.0
+python-jose==3.3.0
+passlib==1.7.4
+python-multipart==0.0.5
+boto3==1.18.44
+azure-mgmt-costmanagement==1.0.0
+google-cloud-billing==1.8.0 

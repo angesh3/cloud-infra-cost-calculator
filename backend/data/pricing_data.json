@@ -1,0 +1,95 @@
+{
+  "aws": {
+    "pxgrid": {
+      "message_cost_per_million": 9.25,
+      "api_requests_cost": 0.00189
+    },
+    "storage": {
+      "dynamodb": {
+        "base_yearly": 60.48,
+        "write_unit": 0.00065,
+        "read_unit": 0.00013
+      },
+      "s3": {
+        "standard_storage_per_gb": 0.023,
+        "data_transfer_per_gb": 0.09
+      }
+    },
+    "container": {
+      "eks": {
+        "base_monthly": 73,
+        "ec2_compute_memory": 71.54
+      }
+    },
+    "network": {
+      "throughput_per_gb": 1.5,
+      "msk": {
+        "broker_cluster_monthly": 101.85,
+        "storage_per_gb": 0.1,
+        "data_transfer_per_gb": 0.02
+      }
+    }
+  },
+  "azure": {
+    "pxgrid": {
+      "message_cost_per_million": 9.15,
+      "api_requests_cost": 0.00179
+    },
+    "storage": {
+      "dynamodb": {
+        "base_yearly": 58.48,
+        "write_unit": 0.00062,
+        "read_unit": 0.00012
+      },
+      "s3": {
+        "standard_storage_per_gb": 0.022,
+        "data_transfer_per_gb": 0.087
+      }
+    },
+    "container": {
+      "eks": {
+        "base_monthly": 71,
+        "ec2_compute_memory": 69.54
+      }
+    },
+    "network": {
+      "throughput_per_gb": 1.4,
+      "msk": {
+        "broker_cluster_monthly": 99.85,
+        "storage_per_gb": 0.09,
+        "data_transfer_per_gb": 0.018
+      }
+    }
+  },
+  "gcp": {
+    "pxgrid": {
+      "message_cost_per_million": 9.2,
+      "api_requests_cost": 0.00184
+    },
+    "storage": {
+      "dynamodb": {
+        "base_yearly": 59.48,
+        "write_unit": 0.00063,
+        "read_unit": 0.00012
+      },
+      "s3": {
+        "standard_storage_per_gb": 0.022,
+        "data_transfer_per_gb": 0.088
+      }
+    },
+    "container": {
+      "eks": {
+        "base_monthly": 72,
+        "ec2_compute_memory": 70.54
+      }
+    },
+    "network": {
+      "throughput_per_gb": 1.45,
+      "msk": {
+        "broker_cluster_monthly": 100.85,
+        "storage_per_gb": 0.095,
+        "data_transfer_per_gb": 0.019
+      }
+    }
+  }
+}

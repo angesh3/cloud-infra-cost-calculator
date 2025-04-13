@@ -1,0 +1,107 @@
+{
+  "aws": {
+    "network": {
+      "Small": {
+        "data_transfer": 0.09,
+        "bandwidth": 0.05
+      },
+      "Medium": {
+        "data_transfer": 0.08,
+        "bandwidth": 0.04
+      },
+      "Large": {
+        "data_transfer": 0.07,
+        "bandwidth": 0.03
+      }
+    },
+    "consumer": {
+      "api_calls": 0.0004,
+      "data_distribution": 0.09
+    },
+    "infrastructure": {
+      "compute": {
+        "small": 0.023,
+        "medium": 0.046,
+        "large": 0.092
+      },
+      "storage": {
+        "standard": 0.023,
+        "premium": 0.046
+      },
+      "services": {
+        "monitoring": 0.3,
+        "logging": 0.5
+      }
+    }
+  },
+  "azure": {
+    "network": {
+      "Small": {
+        "data_transfer": 0.087,
+        "bandwidth": 0.048
+      },
+      "Medium": {
+        "data_transfer": 0.077,
+        "bandwidth": 0.038
+      },
+      "Large": {
+        "data_transfer": 0.067,
+        "bandwidth": 0.028
+      }
+    },
+    "consumer": {
+      "api_calls": 0.00038,
+      "data_distribution": 0.087
+    },
+    "infrastructure": {
+      "compute": {
+        "small": 0.022,
+        "medium": 0.044,
+        "large": 0.088
+      },
+      "storage": {
+        "standard": 0.022,
+        "premium": 0.044
+      },
+      "services": {
+        "monitoring": 0.28,
+        "logging": 0.48
+      }
+    }
+  },
+  "gcp": {
+    "network": {
+      "Small": {
+        "data_transfer": 0.085,
+        "bandwidth": 0.047
+      },
+      "Medium": {
+        "data_transfer": 0.075,
+        "bandwidth": 0.037
+      },
+      "Large": {
+        "data_transfer": 0.065,
+        "bandwidth": 0.027
+      }
+    },
+    "consumer": {
+      "api_calls": 0.00039,
+      "data_distribution": 0.085
+    },
+    "infrastructure": {
+      "compute": {
+        "small": 0.0225,
+        "medium": 0.045,
+        "large": 0.09
+      },
+      "storage": {
+        "standard": 0.0225,
+        "premium": 0.045
+      },
+      "services": {
+        "monitoring": 0.29,
+        "logging": 0.49
+      }
+    }
+  }
+}
