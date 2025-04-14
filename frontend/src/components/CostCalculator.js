@@ -2158,8 +2158,44 @@ function CostCalculator() {
                     <Typography variant="subtitle1">Network Data Load Costs</Typography>
                     <InfoIcon color="action" fontSize="small" />
                   </Box>
-                  <Typography variant="h6">
-                    {formatCurrency(costBreakdown?.breakdown?.pxgrid_cost)}
+                  <Typography variant="body2">
+                    Message Publishing: {formatCurrency(
+                      ((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : minimalConfig.network_load.messages.events_per_day) * 
+                      (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+                      minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) / 1000000 * 9.25 * 30) * 
+                      (formData.region === 'us-east-1' ? 1.0 :
+                       formData.region === 'us-west-2' ? 1.05 :
+                       formData.region === 'eu-west-1' ? 1.12 :
+                       formData.region === 'ap-southeast-1' ? 1.15 : 1.0)
+                    )}
+                  </Typography>
+                  <Typography variant="body2">
+                    API Cost: {formatCurrency(
+                      ((networkLoadEnabled ? networkLoadConfig.api.calls_per_day : minimalConfig.network_load.api.calls_per_day) * 
+                      (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+                      minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) * 0.00189 * 30) * 
+                      (formData.region === 'us-east-1' ? 1.0 :
+                       formData.region === 'us-west-2' ? 1.05 :
+                       formData.region === 'eu-west-1' ? 1.12 :
+                       formData.region === 'ap-southeast-1' ? 1.15 : 1.0)
+                    )}
+                  </Typography>
+                  <Typography variant="h6" sx={{ mt: 1 }}>
+                    Total: {formatCurrency(
+                      // Message Publishing Cost
+                      ((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : minimalConfig.network_load.messages.events_per_day) * 
+                      (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+                      minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) / 1000000 * 9.25 * 30 +
+                      // API Cost
+                      (networkLoadEnabled ? networkLoadConfig.api.calls_per_day : minimalConfig.network_load.api.calls_per_day) * 
+                      (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+                      minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) * 0.00189 * 30) *
+                      // Region Multiplier
+                      (formData.region === 'us-east-1' ? 1.0 :
+                       formData.region === 'us-west-2' ? 1.05 :
+                       formData.region === 'eu-west-1' ? 1.12 :
+                       formData.region === 'ap-southeast-1' ? 1.15 : 1.0)
+                    )}
                   </Typography>
                 </Paper>
               </Grid>
