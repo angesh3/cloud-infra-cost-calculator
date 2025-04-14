@@ -42,7 +42,8 @@ function CostCalculator() {
   };
 
   const defaultNodeConfig = {
-    nodes_per_region: 2
+    elasticache_nodes_per_region: 2,
+    dynamodb_nodes: 1
   };
 
   const defaultNetworkConfig = {
@@ -1580,8 +1581,15 @@ function CostCalculator() {
     const elasticache_base_cost = 300;  // $300 per month for 2 nodes across regions
     const dynamodb_accelerator_cost = 200;  // $200 per node
 
+    // Calculate nodes based on tenant count and load
+    const total_tenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
+    const base_nodes = Math.max(2, Math.ceil(total_tenants / 100));  // 1 node per 100 tenants, minimum 2
+    const nodes_for_load = networkLoadEnabled ? 
+        Math.ceil(networkLoadConfig.messages.events_per_day / 1000000) : 0;  // 1 node per million messages
+    const total_nodes = base_nodes + nodes_for_load;
+
     // Calculate total cost before region multiplier
-    const total_base_cost = elasticache_base_cost + dynamodb_accelerator_cost;
+    const total_base_cost = elasticache_base_cost + (dynamodb_accelerator_cost * total_nodes);
     const final_cost = total_base_cost * region_multiplier;
 
     return [
@@ -1607,8 +1615,17 @@ function CostCalculator() {
             title: 'DynamoDB Accelerator (DAX)',
             items: [
                 {
+                    label: 'Node Configuration',
+                    value: `${total_nodes} nodes`,
+                    details: [
+                        `Base nodes: ${base_nodes} (minimum 2, or 1 per 100 tenants)`,
+                        `Load-based nodes: ${nodes_for_load} (1 per million messages)`,
+                        `Total nodes: ${total_nodes}`
+                    ]
+                },
+                {
                     label: 'Base Cost',
-                    value: formatCurrency(dynamodb_accelerator_cost),
+                    value: formatCurrency(dynamodb_accelerator_cost * total_nodes),
                     details: [
                         'DynamoDB Accelerator',
                         'Base cost: $200 per node',
@@ -1629,7 +1646,7 @@ function CostCalculator() {
                     value: formatCurrency(total_base_cost),
                     details: [
                         `ElastiCache: ${formatCurrency(elasticache_base_cost)}`,
-                        `DynamoDB Accelerator: ${formatCurrency(dynamodb_accelerator_cost)}`,
+                        `DynamoDB Accelerator: ${formatCurrency(dynamodb_accelerator_cost * total_nodes)}`,
                         `Total base cost: ${formatCurrency(total_base_cost)}`
                     ]
                 },
@@ -1847,7 +1864,11 @@ function CostCalculator() {
                                   (costBreakdown?.breakdown?.ecs_fargate || 0);
 
     // Caching Cost (already monthly)
-    const cachingCost = 500; // $300 for ElastiCache + $200 for DynamoDB Accelerator
+    const base_nodes = Math.max(2, Math.ceil(formData.num_tenants / 100));  // 1 node per 100 tenants, minimum 2
+    const nodes_for_load = networkLoadEnabled ? 
+        Math.ceil(networkLoadConfig.messages.events_per_day / 1000000) : 0;  // 1 node per million messages
+    const total_nodes = base_nodes + nodes_for_load;
+    const cachingCost = 300 + (200 * total_nodes); // $300 for ElastiCache + $200 per node for DynamoDB Accelerator
     
     // Calculate total monthly cost
     const totalMonthlyCost = networkDataLoadCost +
@@ -2115,12 +2136,25 @@ function CostCalculator() {
                   <TableBody>
                     <TableRow>
                       <TableCell>1</TableCell>
-                      <TableCell>Nodes per Region</TableCell>
+                      <TableCell>ElastiCache Nodes per Region</TableCell>
                       <TableCell>
                         <TextField
                           type="number"
-                          value={formData.nodes.nodes_per_region}
-                          onChange={(e) => handleNodeInputChange('nodes_per_region', e.target.value)}
+                          value={formData.nodes.elasticache_nodes_per_region}
+                          onChange={(e) => handleNodeInputChange('elasticache_nodes_per_region', e.target.value)}
+                          size="small"
+                          inputProps={{ min: 1 }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell>2</TableCell>
+                      <TableCell>DynamoDB Nodes</TableCell>
+                      <TableCell>
+                        <TextField
+                          type="number"
+                          value={formData.nodes.dynamodb_nodes}
+                          onChange={(e) => handleNodeInputChange('dynamodb_nodes', e.target.value)}
                           size="small"
                           inputProps={{ min: 1 }}
                         />
@@ -2130,23 +2164,12 @@ function CostCalculator() {
                 </Table>
               </TableContainer>
 
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => {
-                    setFormData(prev => ({
-                      ...prev,
-                      nodes: defaultNodeConfig
-                    }));
-                  }}
-                >
-                  Reset to Default
-                </Button>
+              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button
                   variant="contained"
                   onClick={() => setNodeConfigModalOpen(false)}
                 >
-                  Apply
+                  Save Configuration
                 </Button>
               </Box>
             </Box>
@@ -2656,10 +2679,10 @@ function CostCalculator() {
                     ElastiCache: {formatCurrency(300)}
                   </Typography>
                   <Typography variant="body2">
-                    DynamoDB Accelerator: {formatCurrency(200)}
+                    DynamoDB Accelerator: {formatCurrency(200 * (nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes))}
                   </Typography>
                   <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency(500 * (
+                    Total: {formatCurrency((300 + (200 * (nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes))) * (
                       formData.region === 'us-east-1' ? 1.0 :
                       formData.region === 'us-west-2' ? 1.05 :
                       formData.region === 'eu-west-1' ? 1.12 :
