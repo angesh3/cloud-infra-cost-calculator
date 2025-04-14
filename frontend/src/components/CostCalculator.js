@@ -1022,39 +1022,138 @@ function CostCalculator() {
   const getSecurityToolsDetails = (costs) => {
     if (!costs) return [];
     
-    const security_hub = costs.security_hub || 0;
-    const waf = costs.waf || 0;
-    const shield = costs.shield_advanced || 0;
-    const guard_duty = costs.guard_duty || 0;
+    // Base costs per month
+    const security_hub_cost = 80;        // $80 per month
+    const waf_cost = 6;                  // $6 per month
+    const shield_advanced_cost = 3000;    // $3000 per month
+    const guard_duty_cost = 100;         // $100 per month
+    const secrets_manager_cost = 40;     // $40 per month
+    const cert_management_cost = 33;     // $33 per month
+    const access_management_cost = 10;   // $10 per month
     
-    const total = (security_hub + waf + shield + guard_duty) / 12;
+    const total = security_hub_cost + waf_cost + shield_advanced_cost + guard_duty_cost + 
+                 secrets_manager_cost + cert_management_cost + access_management_cost;
     
     return [
       {
-        title: 'Security Tools',
+        title: 'Security Monitoring & Protection',
         items: [
           {
             label: 'Security Hub',
-            value: safeFormatCurrency(security_hub / 12),
-            details: ['$40 per month']
+            value: formatCurrency(security_hub_cost),
+            details: [
+              'AWS Security Hub',
+              'Base cost: $80 per month',
+              'Includes:',
+              '- Security findings aggregation',
+              '- Compliance monitoring',
+              '- Security scores and insights',
+              '- Integration with third-party tools'
+            ]
           },
           {
-            label: 'WAF',
-            value: safeFormatCurrency(waf / 12),
-            details: ['$25 per month']
+            label: 'WAF (Web Application Firewall)',
+            value: formatCurrency(waf_cost),
+            details: [
+              'AWS WAF',
+              'Base cost: $6 per month',
+              'Includes:',
+              '- Web ACL rules',
+              '- Request filtering',
+              '- DDoS protection',
+              '- Custom rule sets'
+            ]
           },
           {
             label: 'Shield Advanced',
-            value: safeFormatCurrency(shield / 12),
-            details: ['$300 per month']
+            value: formatCurrency(shield_advanced_cost),
+            details: [
+              'AWS Shield Advanced',
+              'Base cost: $3,000 per month',
+              'Includes:',
+              '- DDoS protection',
+              '- Real-time attack monitoring',
+              '- 24/7 DDoS response team',
+              '- Cost protection during attacks'
+            ]
           },
           {
             label: 'GuardDuty',
-            value: safeFormatCurrency(guard_duty / 12),
-            details: ['$12 per month']
+            value: formatCurrency(guard_duty_cost),
+            details: [
+              'Amazon GuardDuty',
+              'Base cost: $100 per month',
+              'Includes:',
+              '- Threat detection',
+              '- Continuous monitoring',
+              '- Machine learning-based analysis',
+              '- Automated response options'
+            ]
           }
-        ],
-        total: safeFormatCurrency(total)
+        ]
+      },
+      {
+        title: 'Access & Certificate Management',
+        items: [
+          {
+            label: 'Secrets Manager',
+            value: formatCurrency(secrets_manager_cost),
+            details: [
+              'AWS Secrets Manager',
+              'Base cost: $40 per month',
+              'Includes:',
+              '- Secrets rotation',
+              '- Encryption key management',
+              '- Access control',
+              '- Audit logging'
+            ]
+          },
+          {
+            label: 'Certificate Management',
+            value: formatCurrency(cert_management_cost),
+            details: [
+              'AWS Certificate Manager',
+              'Base cost: $33 per month',
+              'Includes:',
+              '- SSL/TLS certificate management',
+              '- Automatic renewal',
+              '- Integration with AWS services',
+              '- Private certificate authority'
+            ]
+          },
+          {
+            label: 'Access Management',
+            value: formatCurrency(access_management_cost),
+            details: [
+              'AWS IAM',
+              'Base cost: $10 per month',
+              'Includes:',
+              '- Identity management',
+              '- Role-based access control',
+              '- Policy management',
+              '- Access analyzer'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Total Security Costs',
+        items: [
+          {
+            label: 'Total Monthly Cost',
+            value: formatCurrency(total),
+            details: [
+              `Security Hub: ${formatCurrency(security_hub_cost)}`,
+              `WAF: ${formatCurrency(waf_cost)}`,
+              `Shield Advanced: ${formatCurrency(shield_advanced_cost)}`,
+              `GuardDuty: ${formatCurrency(guard_duty_cost)}`,
+              `Secrets Manager: ${formatCurrency(secrets_manager_cost)}`,
+              `Certificate Management: ${formatCurrency(cert_management_cost)}`,
+              `Access Management: ${formatCurrency(access_management_cost)}`,
+              `Total: ${formatCurrency(total)}`
+            ]
+          }
+        ]
       }
     ];
   };
@@ -2175,18 +2274,19 @@ function CostCalculator() {
                     <InfoIcon color="action" fontSize="small" />
                   </Box>
                   <Typography variant="body2">
-                    Security Hub: {safeFormatCurrency((costBreakdown?.breakdown?.security_hub || 0) / 12)}
+                    Security Hub: {formatCurrency(80)}
                   </Typography>
                   <Typography variant="body2">
-                    Shield Advanced: {safeFormatCurrency((costBreakdown?.breakdown?.shield_advanced || 0) / 12)}
+                    WAF & Shield: {formatCurrency(3006)}
+                  </Typography>
+                  <Typography variant="body2">
+                    GuardDuty & IAM: {formatCurrency(110)}
+                  </Typography>
+                  <Typography variant="body2">
+                    Secrets & Certs: {formatCurrency(73)}
                   </Typography>
                   <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {safeFormatCurrency(
-                      ((costBreakdown?.breakdown?.security_hub || 0) +
-                       (costBreakdown?.breakdown?.waf || 0) +
-                       (costBreakdown?.breakdown?.shield_advanced || 0) +
-                       (costBreakdown?.breakdown?.guard_duty || 0)) / 12
-                    )}
+                    Total: {formatCurrency(3269)}
                   </Typography>
                 </Paper>
               </Grid>
