@@ -20,9 +20,13 @@ RUN npm install --legacy-peer-deps --no-audit --no-package-lock && \
 
 # Copy source and build
 COPY . .
+
+# Build and verify build directory exists
 RUN npm run build && \
+    ls -la build && \
     rm -rf node_modules package*.json && \
-    find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true
+    find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true && \
+    ls -la build
 
 # Use minimal nginx
 FROM nginx:alpine-slim
@@ -37,9 +41,13 @@ RUN apk add --no-cache openssl && \
     apk del openssl && \
     rm -rf /var/cache/apk/* /tmp/*
 
-# Copy only built files
-COPY --from=builder /app/build /usr/share/nginx/html
+# Create directory first and verify copy
+RUN mkdir -p /usr/share/nginx/html
+COPY --from=builder /app/build/ /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Verify files were copied
+RUN ls -la /usr/share/nginx/html/
 
 EXPOSE 3000 3443
 
