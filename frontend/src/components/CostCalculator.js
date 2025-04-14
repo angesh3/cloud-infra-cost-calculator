@@ -716,38 +716,87 @@ function CostCalculator() {
                             formData.region === 'eu-west-1' ? 1.12 :
                             formData.region === 'ap-southeast-1' ? 1.15 : 1.0;
     
-    // Use minimal configuration values if network load is not enabled
-    const base_cost = 0.03;  // Fixed base cost
-    const final_cost = base_cost * region_multiplier;
-
-    // Calculate message and API costs based on configuration
-    const message_publishing_base = networkLoadEnabled ? (pxgrid_cost / region_multiplier) * 0.7 : base_cost * 0.7;
-    const api_load_base = networkLoadEnabled ? (pxgrid_cost / region_multiplier) * 0.3 : base_cost * 0.3;
-    const message_publishing_final = message_publishing_base * region_multiplier;
-    const api_load_final = api_load_base * region_multiplier;
-    
     // Get the current configuration based on networkLoadEnabled flag
     const currentConfig = networkLoadEnabled ? networkLoadConfig : minimalConfig.network_load;
+    
+    // Get scale configuration
+    const total_tenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
+    const consumers_per_tenant = scaleConfigEnabled ? formData.scale.consumers_per_tenant : minimalConfig.scale.consumers_per_tenant;
+    const total_consumers = total_tenants * consumers_per_tenant;
+    
+    // Calculate daily costs with scale
+    const messages_per_day = currentConfig.messages.events_per_day * total_consumers;
+    const api_calls_per_day = currentConfig.api.calls_per_day * total_consumers;
+    
+    const daily_message_cost = (messages_per_day / 1000000) * 9.25;
+    const daily_api_cost = api_calls_per_day * 0.00189;
+    const daily_total_cost = daily_message_cost + daily_api_cost;
+    
+    // Calculate monthly base cost (before region multiplier)
+    const monthly_base_cost = daily_total_cost * 30;
+    
+    // Calculate final costs with region multiplier
+    const final_monthly_cost = monthly_base_cost * region_multiplier;
+    
+    // Calculate message and API costs separately
+    const monthly_message_cost = daily_message_cost * 30;
+    const monthly_api_cost = daily_api_cost * 30;
+    const final_message_cost = monthly_message_cost * region_multiplier;
+    const final_api_cost = monthly_api_cost * region_multiplier;
     
     return [
       {
         title: 'Base Cost Calculation',
         items: [
           {
+            label: 'Scale Configuration',
+            value: scaleConfigEnabled ? 'Custom' : 'Minimal',
+            details: [
+              `Total Tenants: ${total_tenants.toLocaleString()}`,
+              `Consumers per Tenant: ${consumers_per_tenant.toLocaleString()}`,
+              `Total Consumers: ${total_consumers.toLocaleString()}`
+            ]
+          },
+          {
             label: 'Base Cost (Before Region Multiplier)',
-            value: formatCurrency(networkLoadEnabled ? pxgrid_cost / region_multiplier : base_cost),
+            value: formatCurrency(monthly_base_cost),
             details: [
               'Daily Message Cost:',
-              `- Messages per day: ${currentConfig.messages.events_per_day}`,
+              `- Base Messages per day: ${currentConfig.messages.events_per_day.toLocaleString()}`,
+              `- Total Messages per day: ${messages_per_day.toLocaleString()} (${currentConfig.messages.events_per_day.toLocaleString()} × ${total_consumers.toLocaleString()} consumers)`,
               `- Cost per million messages: $9.25`,
-              `- Daily message cost: ${formatCurrency((currentConfig.messages.events_per_day * 9.25 / 1000000))}`,
+              `- Daily message cost: ${formatCurrency(daily_message_cost)}`,
               '',
               'Daily API Cost:',
-              `- API calls per day: ${currentConfig.api.calls_per_day}`,
+              `- Base API calls per day: ${currentConfig.api.calls_per_day.toLocaleString()}`,
+              `- Total API calls per day: ${api_calls_per_day.toLocaleString()} (${currentConfig.api.calls_per_day.toLocaleString()} × ${total_consumers.toLocaleString()} consumers)`,
               `- Cost per API call: $0.00189`,
-              `- Daily API cost: ${formatCurrency((currentConfig.api.calls_per_day * 0.00189))}`,
+              `- Daily API cost: ${formatCurrency(daily_api_cost)}`,
               '',
-              `Monthly base cost: ${formatCurrency(networkLoadEnabled ? pxgrid_cost / region_multiplier : base_cost)} (30 days)`
+              `Monthly base cost: ${formatCurrency(monthly_base_cost)} (30 days)`
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Cost Breakdown',
+        items: [
+          {
+            label: 'Message Publishing Cost', 
+            value: formatCurrency(final_message_cost), 
+            details: [
+              `Daily cost: ${formatCurrency(daily_message_cost)}`,
+              `Monthly cost: ${formatCurrency(monthly_message_cost)}`,
+              `After region multiplier: ${formatCurrency(final_message_cost)}`
+            ]
+          },
+          {
+            label: 'API Cost', 
+            value: formatCurrency(final_api_cost), 
+            details: [
+              `Daily cost: ${formatCurrency(daily_api_cost)}`,
+              `Monthly cost: ${formatCurrency(monthly_api_cost)}`,
+              `After region multiplier: ${formatCurrency(final_api_cost)}`
             ]
           }
         ]
@@ -757,7 +806,7 @@ function CostCalculator() {
         items: [
           {
             label: 'Base cost',
-            value: formatCurrency(networkLoadEnabled ? pxgrid_cost / region_multiplier : base_cost),
+            value: formatCurrency(monthly_base_cost),
             details: []
           },
           {
@@ -767,31 +816,10 @@ function CostCalculator() {
           },
           {
             label: 'Final cost',
-            value: formatCurrency(networkLoadEnabled ? pxgrid_cost : final_cost),
+            value: formatCurrency(final_monthly_cost),
             details: [
-              `${formatCurrency(networkLoadEnabled ? pxgrid_cost / region_multiplier : base_cost)} × ${region_multiplier}`,
-              `= ${formatCurrency(networkLoadEnabled ? pxgrid_cost : final_cost)}`
-            ]
-          }
-        ]
-      },
-      {
-        title: 'Cost Breakdown',
-        items: [
-          {
-            label: 'Message Publishing (70%)', 
-            value: formatCurrency(message_publishing_final), 
-            details: [
-              `Base cost: ${formatCurrency(message_publishing_base)}`,
-              `After region multiplier: ${formatCurrency(message_publishing_final)}`
-            ]
-          },
-          {
-            label: 'API Load (30%)', 
-            value: formatCurrency(api_load_final), 
-            details: [
-              `Base cost: ${formatCurrency(api_load_base)}`,
-              `After region multiplier: ${formatCurrency(api_load_final)}`
+              `${formatCurrency(monthly_base_cost)} × ${region_multiplier}`,
+              `= ${formatCurrency(final_monthly_cost)}`
             ]
           }
         ]
