@@ -2,34 +2,47 @@ version: '3.8'
 
 services:
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
-    environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AZURE_TENANT_ID=${AZURE_TENANT_ID}
-      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
-      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
-      - GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}
     volumes:
-      - ./backend:/app
+      - ./backend/app:/app/app
+      - ./backend/services:/app/services
+      - ./backend/models:/app/models
+      - ./backend/utils:/app/utils
+      - ./backend/pricing_data.json:/app/pricing_data.json
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
     environment:
       - REACT_APP_API_URL=http://localhost:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - WDS_SOCKET_PORT=0
+      - CI=false
+      - PORT=3000
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - app-network
+    restart: unless-stopped
 
 networks:
   app-network:
