@@ -536,67 +536,108 @@ function CostCalculator() {
     ];
   };
 
-  const getContainerDetails = (container) => {
-    if (!container) return [];
+  const getContainerDetails = (costs) => {
+    if (!costs) return [];
     
     const region_multiplier = formData.region === 'us-east-1' ? 1.0 :
                             formData.region === 'us-west-2' ? 1.05 :
                             formData.region === 'eu-west-1' ? 1.12 :
                             formData.region === 'ap-southeast-1' ? 1.15 : 1.0;
-    
-    const base_cost = container / region_multiplier;
-    const cluster_base = base_cost * 0.3;
-    const node_base = base_cost * 0.7;
-    
+
+    // Base costs per month
+    const ecr_base_cost = 50;      // $50 per month
+    const helm_base_cost = 10;     // $10 per month
+    const fargate_base_cost = 40;  // $40 per month
+
+    // Calculate total cost before region multiplier
+    const total_base_cost = ecr_base_cost + helm_base_cost + fargate_base_cost;
+    const final_cost = total_base_cost * region_multiplier;
+
     return [
-      {
-        title: 'Base Cost Calculation',
-        items: [
-          {
-            label: 'EKS Cluster Management',
-            value: formatCurrency(cluster_base),
-            details: [
-              'Base monthly cluster cost: $73.00',
-              'Cluster management: 30% of total container cost',
-              `Base cluster cost: ${formatCurrency(cluster_base)}`
+        {
+            title: 'Container Registry (ECR)',
+            items: [
+                {
+                    label: 'ECR Base Cost',
+                    value: formatCurrency(ecr_base_cost),
+                    details: [
+                        'Amazon Elastic Container Registry (ECR)',
+                        'Base cost: $50 per month',
+                        'Includes:',
+                        '- Container image storage',
+                        '- Image scanning',
+                        '- Push/pull operations'
+                    ]
+                }
             ]
-          },
-          {
-            label: 'EC2 Node Groups',
-            value: formatCurrency(node_base),
-            details: [
-              'Base EC2 compute cost: $71.54 per node',
-              'Node groups: 70% of total container cost',
-              `Base node groups cost: ${formatCurrency(node_base)}`
+        },
+        {
+            title: 'Helm Chart Management',
+            items: [
+                {
+                    label: 'Helm Chart Storage',
+                    value: formatCurrency(helm_base_cost),
+                    details: [
+                        'Helm Chart Repository Storage',
+                        'Base cost: $10 per month',
+                        'Includes:',
+                        '- Chart storage',
+                        '- Version management',
+                        '- Repository hosting'
+                    ]
+                }
             ]
-          },
-          {
-            label: 'Total Base Cost',
-            value: formatCurrency(base_cost),
-            details: [
-              `Cluster management: ${formatCurrency(cluster_base)}`,
-              `Node groups: ${formatCurrency(node_base)}`,
-              `Total base cost: ${formatCurrency(base_cost)}`
+        },
+        {
+            title: 'Container Orchestration',
+            items: [
+                {
+                    label: 'ECS Fargate',
+                    value: formatCurrency(fargate_base_cost),
+                    details: [
+                        'AWS Fargate for ECS',
+                        'Base cost: $40 per month',
+                        'Includes:',
+                        '- Container orchestration',
+                        '- Task execution',
+                        '- Service management'
+                    ]
+                }
             ]
-          }
-        ]
-      },
-      {
-        title: 'Container Costs with Region Multiplier',
-        items: [
-          {
-            label: 'Final Container Costs',
-            value: formatCurrency(container),
-            details: [
-              `Base cost: ${formatCurrency(base_cost)}`,
-              `Region multiplier: ${region_multiplier}x`,
-              `Final cost: ${formatCurrency(container)}`
+        },
+        {
+            title: 'Cost Summary',
+            items: [
+                {
+                    label: 'Base cost (before region multiplier)',
+                    value: formatCurrency(total_base_cost),
+                    details: [
+                        `ECR: ${formatCurrency(ecr_base_cost)}`,
+                        `Helm Chart Storage: ${formatCurrency(helm_base_cost)}`,
+                        `ECS Fargate: ${formatCurrency(fargate_base_cost)}`,
+                        `Total base cost: ${formatCurrency(total_base_cost)}`
+                    ]
+                },
+                {
+                    label: `Region multiplier (${formData.region})`,
+                    value: `${region_multiplier}x`,
+                    details: [
+                        `Selected region: ${formData.region}`,
+                        `Multiplier: ${region_multiplier}x`
+                    ]
+                },
+                {
+                    label: 'Final monthly cost',
+                    value: formatCurrency(final_cost),
+                    details: [
+                        `${formatCurrency(total_base_cost)} × ${region_multiplier}`,
+                        `= ${formatCurrency(final_cost)}`
+                    ]
+                }
             ]
-          }
-        ]
-      }
+        }
     ];
-  };
+};
 
   const getNetworkDetails = (network) => {
     if (!network) return [];
@@ -1130,29 +1171,105 @@ function CostCalculator() {
   const getContainerManagementDetails = (costs) => {
     if (!costs) return [];
     
+    const region_multiplier = formData.region === 'us-east-1' ? 1.0 :
+                            formData.region === 'us-west-2' ? 1.05 :
+                            formData.region === 'eu-west-1' ? 1.12 :
+                            formData.region === 'ap-southeast-1' ? 1.15 : 1.0;
+
+    // Base costs per month
+    const ecr_base_cost = 50;      // $50 per month
+    const helm_base_cost = 10;     // $10 per month
+    const fargate_base_cost = 40;  // $40 per month
+
+    // Calculate total cost before region multiplier
+    const total_base_cost = ecr_base_cost + helm_base_cost + fargate_base_cost;
+    const final_cost = total_base_cost * region_multiplier;
+
     return [
-      {
-        title: 'Container Management',
-        items: [
-          {
-            label: 'ECR',
-            value: formatCurrency(costs.ecr / 12),
-            details: ['$50 per month']
-          },
-          {
-            label: 'Helm Chart Storage',
-            value: formatCurrency(costs.helm_storage / 12),
-            details: ['$10 per month']
-          },
-          {
-            label: 'ECS Fargate',
-            value: formatCurrency(costs.ecs_fargate / 12),
-            details: ['$40 per month']
-          }
-        ]
-      }
+        {
+            title: 'Container Registry (ECR)',
+            items: [
+                {
+                    label: 'ECR Base Cost',
+                    value: formatCurrency(ecr_base_cost),
+                    details: [
+                        'Amazon Elastic Container Registry (ECR)',
+                        'Base cost: $50 per month',
+                        'Includes:',
+                        '- Container image storage',
+                        '- Image scanning',
+                        '- Push/pull operations'
+                    ]
+                }
+            ]
+        },
+        {
+            title: 'Helm Chart Management',
+            items: [
+                {
+                    label: 'Helm Chart Storage',
+                    value: formatCurrency(helm_base_cost),
+                    details: [
+                        'Helm Chart Repository Storage',
+                        'Base cost: $10 per month',
+                        'Includes:',
+                        '- Chart storage',
+                        '- Version management',
+                        '- Repository hosting'
+                    ]
+                }
+            ]
+        },
+        {
+            title: 'Container Orchestration',
+            items: [
+                {
+                    label: 'ECS Fargate',
+                    value: formatCurrency(fargate_base_cost),
+                    details: [
+                        'AWS Fargate for ECS',
+                        'Base cost: $40 per month',
+                        'Includes:',
+                        '- Container orchestration',
+                        '- Task execution',
+                        '- Service management'
+                    ]
+                }
+            ]
+        },
+        {
+            title: 'Cost Summary',
+            items: [
+                {
+                    label: 'Base cost (before region multiplier)',
+                    value: formatCurrency(total_base_cost),
+                    details: [
+                        `ECR: ${formatCurrency(ecr_base_cost)}`,
+                        `Helm Chart Storage: ${formatCurrency(helm_base_cost)}`,
+                        `ECS Fargate: ${formatCurrency(fargate_base_cost)}`,
+                        `Total base cost: ${formatCurrency(total_base_cost)}`
+                    ]
+                },
+                {
+                    label: `Region multiplier (${formData.region})`,
+                    value: `${region_multiplier}x`,
+                    details: [
+                        `Selected region: ${formData.region}`,
+                        `Multiplier: ${region_multiplier}x`
+                    ]
+                },
+                {
+                    label: 'Final monthly cost',
+                    value: formatCurrency(final_cost),
+                    details: [
+                        `${formatCurrency(total_base_cost)} × ${region_multiplier}`,
+                        `= ${formatCurrency(final_cost)}`
+                    ]
+                }
+            ]
+        }
     ];
-  };
+};
 
   const handleShowDetails = (type, data) => {
     let details;
@@ -1991,16 +2108,22 @@ function CostCalculator() {
                     <InfoIcon color="action" fontSize="small" />
                   </Box>
                   <Typography variant="body2">
-                    ECR: {safeFormatCurrency((costBreakdown?.breakdown?.ecr || 0) / 12)}
+                    ECR: {formatCurrency(50)}
                   </Typography>
                   <Typography variant="body2">
-                    ECS Fargate: {safeFormatCurrency((costBreakdown?.breakdown?.ecs_fargate || 0) / 12)}
+                    Helm Chart Storage: {formatCurrency(10)}
+                  </Typography>
+                  <Typography variant="body2">
+                    ECS Fargate: {formatCurrency(40)}
                   </Typography>
                   <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {safeFormatCurrency(
-                      ((costBreakdown?.breakdown?.ecr || 0) +
-                       (costBreakdown?.breakdown?.helm_storage || 0) +
-                       (costBreakdown?.breakdown?.ecs_fargate || 0)) / 12
+                    Total: {formatCurrency(
+                      (50 + 10 + 40) * (
+                        formData.region === 'us-east-1' ? 1.0 :
+                        formData.region === 'us-west-2' ? 1.05 :
+                        formData.region === 'eu-west-1' ? 1.12 :
+                        formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+                      )
                     )}
                   </Typography>
                 </Paper>
