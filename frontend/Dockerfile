@@ -8,15 +8,17 @@ RUN apk add --no-cache python3 make g++
 # Copy package files
 COPY package*.json ./
 
-# Set memory limits and install dependencies
-ENV NODE_OPTIONS="--max-old-space-size=512"
-ENV NODE_ENV=production
-RUN npm ci --only=production --legacy-peer-deps
+# Install dependencies with clean npm cache and legacy peer deps
+RUN npm cache clean --force && \
+    npm install --legacy-peer-deps && \
+    npm install recharts@2.7.2 --legacy-peer-deps
 
 # Copy source code
 COPY . .
 
 # Build with optimization flags
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+ENV NODE_ENV=production
 RUN npm run build
 
 # Use nginx to serve the static files
