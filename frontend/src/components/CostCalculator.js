@@ -400,7 +400,7 @@ function CostCalculator() {
           endpoints_per_tenant: data.scale.endpoints_per_tenant
         } : minimalConfig.scale,
         cloud_provider: data.cloud_provider,
-        region: data.region,  // Ensure region is at the top level
+        region: data.region,
         deployment: {
           num_tenants: scaleConfigEnabled ? data.scale.total_tenants : minimalConfig.scale.total_tenants,
           consumers_per_tenant: scaleConfigEnabled ? data.scale.consumers_per_tenant : minimalConfig.scale.consumers_per_tenant,
@@ -413,7 +413,7 @@ function CostCalculator() {
             ((minimalConfig.network_load.api.calls_per_day * minimalConfig.network_load.api.request_size_mb / 1024) +
              (minimalConfig.network_load.messages.events_per_day * minimalConfig.network_load.messages.message_size_kb / (1024 * 1024))),
           data_per_tenant_gb: 1,
-          region: data.region,  // Also include region in deployment
+          region: data.region,
           network_metrics: {
             message_size_kb: networkLoadEnabled ? networkLoadConfig.messages.message_size_kb : minimalConfig.network_load.messages.message_size_kb
           }
@@ -422,7 +422,16 @@ function CostCalculator() {
       
       console.log('DEBUG: Sending request with data:', JSON.stringify(requestData, null, 2));
       
-      const response = await axios.post('http://localhost:8000/calculate-cost', requestData);
+      const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const response = await axios.post(`${baseURL}/calculate-cost`, requestData, {
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        validateStatus: function (status) {
+          return status >= 200 && status < 500;
+        }
+      });
+      
       console.log('DEBUG: Received response:', JSON.stringify(response.data, null, 2));
       
       // Verify the region in the response
