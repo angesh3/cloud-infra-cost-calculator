@@ -2426,24 +2426,18 @@ function CostCalculator() {
                     <InfoIcon color="action" fontSize="small" />
                   </Box>
                   <Typography variant="body2">
-                    Infrastructure: {formatCurrency(
-                      73 + (71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100) + 
-                      Math.floor((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1) / 1_000_000)))
-                    )}
+                    ECR & Helm: {formatCurrency(60)} {/* $50 ECR + $10 Helm */}
                   </Typography>
                   <Typography variant="body2">
-                    Management: {formatCurrency(100)}
+                    ECS Fargate: {formatCurrency(40)}
                   </Typography>
                   <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency(
-                      (73 + (71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100) + 
-                      Math.floor((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1) / 1_000_000))) + 100) * (
-                        formData.region === 'us-east-1' ? 1.0 :
-                        formData.region === 'us-west-2' ? 1.05 :
-                        formData.region === 'eu-west-1' ? 1.12 :
-                        formData.region === 'ap-southeast-1' ? 1.15 : 1.0
-                      )
-                    )}
+                    Total: {formatCurrency(100 * (
+                      formData.region === 'us-east-1' ? 1.0 :
+                      formData.region === 'us-west-2' ? 1.05 :
+                      formData.region === 'eu-west-1' ? 1.12 :
+                      formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+                    ))}
                   </Typography>
                 </Paper>
               </Grid>
