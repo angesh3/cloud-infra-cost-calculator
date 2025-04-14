@@ -2,44 +2,47 @@ FROM node:18-alpine as builder
 
 WORKDIR /app
 
-# Install dependencies required for node-gyp
-RUN apk add --no-cache python3 make g++
+# Install dependencies required for node-gyp and clean up in the same layer
+RUN apk add --no-cache python3 make g++ && \
+    rm -rf /var/cache/apk/*
 
-# Copy package files
+# Copy only package files first
 COPY package*.json ./
 
-# Install dependencies with clean npm cache and legacy peer deps
+# Install dependencies with cleanup in a single layer
 RUN npm cache clean --force && \
-    npm install --legacy-peer-deps && \
-    npm install recharts@2.7.2 --legacy-peer-deps
+    npm install --legacy-peer-deps --no-audit --production=false && \
+    npm install recharts@2.7.2 --legacy-peer-deps --no-audit && \
+    npm cache clean --force && \
+    rm -rf /tmp/*
 
 # Copy source code
 COPY . .
 
-# Build with optimization flags
+# Build with optimization flags and cleanup
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 ENV NODE_ENV=production
-RUN npm run build
+RUN npm run build && \
+    npm prune --production && \
+    rm -rf node_modules && \
+    rm -rf /tmp/*
 
 # Use nginx to serve the static files
 FROM nginx:alpine
 
-# Install OpenSSL
-RUN apk add --no-cache openssl
+# Install OpenSSL and clean up in the same layer
+RUN apk add --no-cache openssl && \
+    rm -rf /var/cache/apk/*
 
-# Create SSL directory
-RUN mkdir -p /etc/nginx/ssl
-
-# Generate self-signed certificate
-RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+# Create SSL directory and generate certificate in a single layer
+RUN mkdir -p /etc/nginx/ssl && \
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/private.key \
     -out /etc/nginx/ssl/certificate.crt \
     -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"
 
-# Copy the build output
+# Copy the build output and nginx configuration
 COPY --from=builder /app/build /usr/share/nginx/html
-
-# Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 3000 3443
