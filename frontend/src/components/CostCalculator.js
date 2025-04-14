@@ -1014,20 +1014,116 @@ function CostCalculator() {
   const getLoadBalancerDetails = (costs) => {
     if (!costs) return [];
     
+    const region_multiplier = formData.region === 'us-east-1' ? 1.0 :
+                            formData.region === 'us-west-2' ? 1.05 :
+                            formData.region === 'eu-west-1' ? 1.12 :
+                            formData.region === 'ap-southeast-1' ? 1.15 : 1.0;
+
+    // Get current configuration values based on enabled flags
+    const total_tenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
+    const consumers_per_tenant = scaleConfigEnabled ? formData.scale.consumers_per_tenant : minimalConfig.scale.consumers_per_tenant;
+    
+    // Calculate request costs
+    const daily_api_calls = networkLoadEnabled ? 
+        networkLoadConfig.api.calls_per_day * total_tenants * consumers_per_tenant :
+        minimalConfig.network_load.api.calls_per_day * total_tenants * consumers_per_tenant;
+    
+    const monthly_api_calls = daily_api_calls * 30;
+    const monthly_api_calls_millions = monthly_api_calls / 1_000_000;
+    
+    // API Gateway costs - $100 per million requests
+    const api_gateway_cost = monthly_api_calls_millions * 100;
+    
+    // Application Load Balancer costs
+    const alb_base_cost = 200; // Base cost of $200
+    
+    // Calculate total cost before region multiplier
+    const total_base_cost = api_gateway_cost + alb_base_cost;
+    const final_cost = total_base_cost * region_multiplier;
+    
     return [
-      {
-        title: 'API & Load Balancing',
-        items: [
-          {
-            label: 'Load Balancer',
-            value: formatCurrency(costs.load_balancer_base / 12),
-            details: [
-              'Base cost: $100 per month',
-              'Includes Application Load Balancer and request costs'
+        {
+            title: 'API Gateway Details',
+            items: [
+                {
+                    label: 'Monthly API Calls',
+                    value: monthly_api_calls.toLocaleString(),
+                    details: [
+                        `Daily API calls: ${daily_api_calls.toLocaleString()}`,
+                        `Monthly API calls: ${daily_api_calls.toLocaleString()} × 30 = ${monthly_api_calls.toLocaleString()}`,
+                        `API calls in millions: ${monthly_api_calls_millions.toFixed(3)}`
+                    ]
+                },
+                {
+                    label: 'API Gateway Cost',
+                    value: formatCurrency(api_gateway_cost),
+                    details: [
+                        'Rate: $100 per million requests',
+                        `Cost = ${monthly_api_calls_millions.toFixed(3)} million × $100`,
+                        `= ${formatCurrency(api_gateway_cost)}`
+                    ]
+                }
             ]
-          }
-        ]
-      }
+        },
+        {
+            title: 'Application Load Balancer Details',
+            items: [
+                {
+                    label: 'ALB Base Cost',
+                    value: formatCurrency(alb_base_cost),
+                    details: [
+                        'Fixed monthly base cost: $200',
+                        'Includes infrastructure and request costs'
+                    ]
+                }
+            ]
+        },
+        {
+            title: 'Final Cost Calculation',
+            items: [
+                {
+                    label: 'API Gateway Cost',
+                    value: formatCurrency(api_gateway_cost),
+                    details: [
+                        `Monthly API calls: ${monthly_api_calls.toLocaleString()}`,
+                        `API calls in millions: ${monthly_api_calls_millions.toFixed(3)}`,
+                        `Rate: $100 per million requests`,
+                        `Cost = ${monthly_api_calls_millions.toFixed(3)} million × $100`,
+                        `= ${formatCurrency(api_gateway_cost)}`
+                    ]
+                },
+                {
+                    label: 'ALB Base Cost',
+                    value: formatCurrency(alb_base_cost),
+                    details: [
+                        'Fixed monthly base cost: $200',
+                        'Includes infrastructure and request costs'
+                    ]
+                },
+                {
+                    label: 'Base cost (before region multiplier)',
+                    value: formatCurrency(total_base_cost),
+                    details: [
+                        `API Gateway: ${formatCurrency(api_gateway_cost)}`,
+                        `ALB Base: ${formatCurrency(alb_base_cost)}`,
+                        `Total base cost: ${formatCurrency(total_base_cost)}`
+                    ]
+                },
+                {
+                    label: `Region multiplier (${formData.region})`,
+                    value: `${region_multiplier}x`,
+                    details: []
+                },
+                {
+                    label: 'Final monthly cost',
+                    value: formatCurrency(final_cost),
+                    details: [
+                        `${formatCurrency(total_base_cost)} × ${region_multiplier}`,
+                        `= ${formatCurrency(final_cost)}`
+                    ]
+                }
+            ]
+        }
     ];
   };
 
@@ -1861,8 +1957,22 @@ function CostCalculator() {
                     <Typography variant="subtitle1">API & Load Balancing</Typography>
                     <InfoIcon color="action" fontSize="small" />
                   </Box>
-                  <Typography variant="h6">
-                    {safeFormatCurrency((costBreakdown?.breakdown?.load_balancer_base || 0) / 12)}
+                  <Typography variant="body2">
+                    API Gateway: {formatCurrency(
+                      (networkLoadEnabled ? 
+                        (networkLoadConfig.api.calls_per_day * formData.scale.total_tenants * formData.scale.consumers_per_tenant * 30 / 1_000_000 * 100) :
+                        (minimalConfig.network_load.api.calls_per_day * minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant * 30 / 1_000_000 * 100))
+                    )}
+                  </Typography>
+                  <Typography variant="body2">
+                    ALB Base: {formatCurrency(200)}
+                  </Typography>
+                  <Typography variant="h6" sx={{ mt: 1 }}>
+                    Total: {formatCurrency(
+                      (networkLoadEnabled ? 
+                        (networkLoadConfig.api.calls_per_day * formData.scale.total_tenants * formData.scale.consumers_per_tenant * 30 / 1_000_000 * 100) :
+                        (minimalConfig.network_load.api.calls_per_day * minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant * 30 / 1_000_000 * 100)) + 200
+                    )}
                   </Typography>
                 </Paper>
               </Grid>
