@@ -8,11 +8,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/app:/app/app
-      - ./backend/services:/app/services
-      - ./backend/models:/app/models
-      - ./backend/utils:/app/utils
-      - ./backend/pricing_data.json:/app/pricing_data.json
+      - ./backend:/app
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
@@ -30,19 +26,27 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
-      - WDS_SOCKET_PORT=0
-      - CI=false
-      - PORT=3000
+      - NODE_ENV=production
+      - NODE_OPTIONS=--max-old-space-size=512
     depends_on:
       backend:
         condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
 
 networks:
   app-network:
