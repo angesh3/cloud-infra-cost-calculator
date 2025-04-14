@@ -932,33 +932,89 @@ function CostCalculator() {
   const getInfraManagementDetails = (costs) => {
     if (!costs) return [];
     
-    const terraform = costs.terraform_saas || 0;
-    const gitlab = costs.gitlab_ci || 0;
-    const slack = costs.slack_seat || 0;
+    // Base costs per month
+    const terraform_s3_cost = 3;        // $3 per month
+    const terraform_dynamodb_cost = 2;   // $2 per month
+    const cicd_pipeline_cost = 51;      // $51 per month
+    const multi_region_cost = 222;      // $222 per month
     
-    const total = (terraform + gitlab + slack) / 12;
+    const total = terraform_s3_cost + terraform_dynamodb_cost + cicd_pipeline_cost + multi_region_cost;
     
     return [
       {
-        title: 'Infrastructure Management Tools',
+        title: 'Terraform State Management',
         items: [
           {
-            label: 'Terraform (SaaS)',
-            value: safeFormatCurrency(terraform / 12),
-            details: ['$12 per month']
+            label: 'Terraform State (S3)',
+            value: formatCurrency(terraform_s3_cost),
+            details: [
+              'S3 bucket for Terraform state storage',
+              'Base cost: $3 per month',
+              'Includes:',
+              '- State file storage',
+              '- Version history',
+              '- State locking'
+            ]
           },
           {
-            label: 'GitLab CI Pipeline',
-            value: safeFormatCurrency(gitlab / 12),
-            details: ['$21 per month']
-          },
-          {
-            label: 'Slack (1 seat)',
-            value: safeFormatCurrency(slack / 12),
-            details: ['$2 per month']
+            label: 'Terraform State (DynamoDB)',
+            value: formatCurrency(terraform_dynamodb_cost),
+            details: [
+              'DynamoDB table for state locking',
+              'Base cost: $2 per month',
+              'Includes:',
+              '- State locking table',
+              '- Concurrent operations management'
+            ]
           }
-        ],
-        total: safeFormatCurrency(total)
+        ]
+      },
+      {
+        title: 'Deployment Infrastructure',
+        items: [
+          {
+            label: 'CI/CD Pipeline',
+            value: formatCurrency(cicd_pipeline_cost),
+            details: [
+              'GitLab CI/CD Pipeline',
+              'Base cost: $51 per month',
+              'Includes:',
+              '- Pipeline execution minutes',
+              '- Artifact storage',
+              '- Container registry',
+              '- Runner costs'
+            ]
+          },
+          {
+            label: 'Multi-Region Deployment',
+            value: formatCurrency(multi_region_cost),
+            details: [
+              'Multi-Region Infrastructure',
+              'Base cost: $222 per month',
+              'Includes:',
+              '- Cross-region replication',
+              '- Data transfer costs',
+              '- Additional infrastructure overhead',
+              '- Disaster recovery setup'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Total Infrastructure Management Costs',
+        items: [
+          {
+            label: 'Total Monthly Cost',
+            value: formatCurrency(total),
+            details: [
+              `Terraform S3: ${formatCurrency(terraform_s3_cost)}`,
+              `Terraform DynamoDB: ${formatCurrency(terraform_dynamodb_cost)}`,
+              `CI/CD Pipeline: ${formatCurrency(cicd_pipeline_cost)}`,
+              `Multi-Region Deployment: ${formatCurrency(multi_region_cost)}`,
+              `Total: ${formatCurrency(total)}`
+            ]
+          }
+        ]
       }
     ];
   };
@@ -2083,16 +2139,23 @@ function CostCalculator() {
                     <InfoIcon color="action" fontSize="small" />
                   </Box>
                   <Typography variant="body2">
-                    Terraform: {safeFormatCurrency((costBreakdown?.breakdown?.terraform_saas || 0) / 12)}
+                    Terraform State (S3): {formatCurrency(costBreakdown?.breakdown?.terraform_s3 || 3)}
                   </Typography>
                   <Typography variant="body2">
-                    GitLab CI: {safeFormatCurrency((costBreakdown?.breakdown?.gitlab_ci || 0) / 12)}
+                    Terraform State (DynamoDB): {formatCurrency(costBreakdown?.breakdown?.terraform_dynamodb || 2)}
+                  </Typography>
+                  <Typography variant="body2">
+                    CI/CD Pipeline: {formatCurrency(costBreakdown?.breakdown?.cicd_pipeline || 51)}
+                  </Typography>
+                  <Typography variant="body2">
+                    Multi-Region: {formatCurrency(costBreakdown?.breakdown?.multi_region_deployment || 222)}
                   </Typography>
                   <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {safeFormatCurrency(
-                      ((costBreakdown?.breakdown?.terraform_saas || 0) +
-                       (costBreakdown?.breakdown?.gitlab_ci || 0) +
-                       (costBreakdown?.breakdown?.slack_seat || 0)) / 12
+                    Total: {formatCurrency(
+                      (costBreakdown?.breakdown?.terraform_s3 || 3) +
+                      (costBreakdown?.breakdown?.terraform_dynamodb || 2) +
+                      (costBreakdown?.breakdown?.cicd_pipeline || 51) +
+                      (costBreakdown?.breakdown?.multi_region_deployment || 222)
                     )}
                   </Typography>
                 </Paper>
