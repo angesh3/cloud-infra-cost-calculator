@@ -45,32 +45,82 @@ A comprehensive tool for calculating cloud infrastructure costs for on-premise t
 - Docker Desktop (latest version)
 - Docker Compose
 
-## Quick Start with Docker
+## Quick Start with Podman
 
-1. Clone the repository:
+1. Install Podman and Podman Compose:
    ```bash
-   git clone https://github.com/angesh3/cloud-infra-cost-calculator.git
-   cd cloud-infra-cost-calculator
+   # For macOS
+   brew install podman podman-compose
+
+   # For Ubuntu/Debian
+   sudo apt-get install podman podman-compose
+
+   # For RHEL/CentOS/Fedora
+   sudo dnf install podman podman-compose
    ```
 
-2. Start the application using Docker Compose:
+2. Initialize Podman machine (for macOS):
    ```bash
-   docker-compose up --build
+   podman machine init
+   podman machine start
    ```
 
-   This command will:
-   - Build the frontend and backend Docker images
-   - Start the containers
-   - Set up the network between services
-   - Configure health checks
+3. Build and run the application:
+   ```bash
+   podman-compose -f podman-compose.yml up --build
+   ```
 
-3. Access the application:
+4. Access the application:
    - Frontend: http://localhost:3000
    - Backend API docs: http://localhost:8000/docs
 
-4. To stop the application:
+## Development with Podman
+
+### Starting the Application
+```bash
+# Start all services
+podman-compose -f podman-compose.yml up
+
+# Start in detached mode
+podman-compose -f podman-compose.yml up -d
+
+# Build and start
+podman-compose -f podman-compose.yml up --build
+```
+
+### Managing Containers
+```bash
+# Stop all services
+podman-compose -f podman-compose.yml down
+
+# View logs
+podman-compose -f podman-compose.yml logs
+
+# View running containers
+podman ps
+
+# Clean up
+podman system prune
+```
+
+### Troubleshooting
+1. SELinux Issues:
+   - The `:Z` suffix is added to volume mounts to handle SELinux contexts
+   - If you encounter permission issues, try:
+     ```bash
+     chcon -Rt container_file_t ./frontend
+     chcon -Rt container_file_t ./backend
+     ```
+
+2. Port Conflicts:
    ```bash
-   docker-compose down
+   # Check if ports are in use
+   lsof -i :3000
+   lsof -i :8000
+
+   # Kill processes using those ports
+   kill $(lsof -t -i:3000)
+   kill $(lsof -t -i:8000)
    ```
 
 ## Manual Setup (Development)

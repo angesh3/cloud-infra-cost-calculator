@@ -1,0 +1,46 @@
+# Podman Compose configuration
+name: cloud-infra-cost-calculator
+
+services:
+  backend:
+    container_name: cost-calculator-backend
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app:Z
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  frontend:
+    container_name: cost-calculator-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app:Z
+      - frontend-node-modules:/app/node_modules:Z
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - WDS_SOCKET_PORT=0
+      - CI=false
+      - PORT=3000
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  frontend-node-modules: 
