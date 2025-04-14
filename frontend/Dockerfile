@@ -15,14 +15,16 @@ ENV NODE_OPTIONS="--max-old-space-size=512"
 # Install dependencies in a single layer with cleanup
 RUN npm install --legacy-peer-deps --no-audit --no-package-lock && \
     npm install recharts@2.7.2 --legacy-peer-deps --no-audit --no-package-lock && \
+    npm install ajv@^8.0.0 ajv-keywords@^5.0.0 --legacy-peer-deps --no-audit --no-package-lock && \
     npm cache clean --force && \
     rm -rf /root/.npm/* /tmp/*
 
 # Copy source and build
 COPY . .
 
-# Build and verify build directory exists
-RUN npm run build && \
+# Build with verification
+RUN npm run build || (echo "Build failed" && exit 1) && \
+    if [ ! -d "build" ]; then echo "Build directory not created" && exit 1; fi && \
     ls -la build && \
     rm -rf node_modules package*.json && \
     find . -type d -name "node_modules" -exec rm -rf {} + 2>/dev/null || true && \
