@@ -544,63 +544,64 @@ function CostCalculator() {
                             formData.region === 'eu-west-1' ? 1.12 :
                             formData.region === 'ap-southeast-1' ? 1.15 : 1.0;
 
-    // Base costs per month
-    const ecr_base_cost = 50;      // $50 per month
-    const helm_base_cost = 10;     // $10 per month
-    const fargate_base_cost = 40;  // $40 per month
+    // Get configuration values
+    const total_tenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
+    const messages_per_day = networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1;
 
-    // Calculate total cost before region multiplier
-    const total_base_cost = ecr_base_cost + helm_base_cost + fargate_base_cost;
+    // Calculate nodes based on tenants and message load
+    const base_nodes = Math.max(2, Math.floor(total_tenants / 100));  // Minimum 2 nodes
+    const nodes_for_load = Math.floor(messages_per_day / 1_000_000);  // Add node per million messages
+    const total_nodes = base_nodes + nodes_for_load;
+
+    // Base costs per month from AWS pricing
+    const cluster_base_cost = 73;  // $73 per month
+    const compute_cost_per_node = 71.54;  // $71.54 per node
+    const total_compute_cost = compute_cost_per_node * total_nodes;
+
+    // Calculate total cost
+    const total_base_cost = cluster_base_cost + total_compute_cost;
     const final_cost = total_base_cost * region_multiplier;
 
     return [
         {
-            title: 'Container Registry (ECR)',
+            title: 'EKS Cluster Configuration',
             items: [
                 {
-                    label: 'ECR Base Cost',
-                    value: formatCurrency(ecr_base_cost),
+                    label: 'Base Cluster Cost',
+                    value: formatCurrency(cluster_base_cost),
                     details: [
-                        'Amazon Elastic Container Registry (ECR)',
-                        'Base cost: $50 per month',
-                        'Includes:',
-                        '- Container image storage',
-                        '- Image scanning',
-                        '- Push/pull operations'
+                        'Amazon Elastic Kubernetes Service (EKS)',
+                        `Base cluster cost: ${formatCurrency(cluster_base_cost)} per month`
+                    ]
+                },
+                {
+                    label: 'Node Configuration',
+                    value: `${total_nodes} nodes`,
+                    details: [
+                        `Base nodes: ${base_nodes} (minimum 2, or 1 per 100 tenants)`,
+                        `Load-based nodes: ${nodes_for_load} (1 per million messages)`,
+                        `Total nodes: ${total_nodes}`
                     ]
                 }
             ]
         },
         {
-            title: 'Helm Chart Management',
+            title: 'Compute Costs',
             items: [
                 {
-                    label: 'Helm Chart Storage',
-                    value: formatCurrency(helm_base_cost),
+                    label: 'Cost per Node',
+                    value: formatCurrency(compute_cost_per_node),
                     details: [
-                        'Helm Chart Repository Storage',
-                        'Base cost: $10 per month',
-                        'Includes:',
-                        '- Chart storage',
-                        '- Version management',
-                        '- Repository hosting'
+                        'EC2 compute and memory cost per node',
+                        'Based on standard instance type for EKS workloads'
                     ]
-                }
-            ]
-        },
-        {
-            title: 'Container Orchestration',
-            items: [
+                },
                 {
-                    label: 'ECS Fargate',
-                    value: formatCurrency(fargate_base_cost),
+                    label: 'Total Compute Cost',
+                    value: formatCurrency(total_compute_cost),
                     details: [
-                        'AWS Fargate for ECS',
-                        'Base cost: $40 per month',
-                        'Includes:',
-                        '- Container orchestration',
-                        '- Task execution',
-                        '- Service management'
+                        `${total_nodes} nodes × ${formatCurrency(compute_cost_per_node)}`,
+                        `= ${formatCurrency(total_compute_cost)}`
                     ]
                 }
             ]
@@ -609,13 +610,12 @@ function CostCalculator() {
             title: 'Cost Summary',
             items: [
                 {
-                    label: 'Base cost (before region multiplier)',
+                    label: 'Base Infrastructure Cost',
                     value: formatCurrency(total_base_cost),
                     details: [
-                        `ECR: ${formatCurrency(ecr_base_cost)}`,
-                        `Helm Chart Storage: ${formatCurrency(helm_base_cost)}`,
-                        `ECS Fargate: ${formatCurrency(fargate_base_cost)}`,
-                        `Total base cost: ${formatCurrency(total_base_cost)}`
+                        `Cluster base: ${formatCurrency(cluster_base_cost)}`,
+                        `Compute cost: ${formatCurrency(total_compute_cost)}`,
+                        `Total: ${formatCurrency(total_base_cost)}`
                     ]
                 },
                 {
@@ -2152,8 +2152,23 @@ function CostCalculator() {
                     <Typography variant="subtitle1">Container Costs</Typography>
                     <InfoIcon color="action" fontSize="small" />
                   </Box>
-                  <Typography variant="h6">
-                    {formatCurrency(costBreakdown?.breakdown?.container_cost)}
+                  <Typography variant="body2">
+                    EKS Base: {formatCurrency(73)}
+                  </Typography>
+                  <Typography variant="body2">
+                    Compute: {formatCurrency(71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100) + 
+                      Math.floor((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1) / 1_000_000)))}
+                  </Typography>
+                  <Typography variant="h6" sx={{ mt: 1 }}>
+                    Total: {formatCurrency(
+                      (73 + (71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100) + 
+                      Math.floor((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1) / 1_000_000)))) * (
+                        formData.region === 'us-east-1' ? 1.0 :
+                        formData.region === 'us-west-2' ? 1.05 :
+                        formData.region === 'eu-west-1' ? 1.12 :
+                        formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+                      )
+                    )}
                   </Typography>
                 </Paper>
               </Grid>
@@ -2369,17 +2384,18 @@ function CostCalculator() {
                     <InfoIcon color="action" fontSize="small" />
                   </Box>
                   <Typography variant="body2">
-                    ECR: {formatCurrency(50)}
+                    Infrastructure: {formatCurrency(
+                      73 + (71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100) + 
+                      Math.floor((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1) / 1_000_000)))
+                    )}
                   </Typography>
                   <Typography variant="body2">
-                    Helm Chart Storage: {formatCurrency(10)}
-                  </Typography>
-                  <Typography variant="body2">
-                    ECS Fargate: {formatCurrency(40)}
+                    Management: {formatCurrency(100)}
                   </Typography>
                   <Typography variant="h6" sx={{ mt: 1 }}>
                     Total: {formatCurrency(
-                      (50 + 10 + 40) * (
+                      (73 + (71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100) + 
+                      Math.floor((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1) / 1_000_000))) + 100) * (
                         formData.region === 'us-east-1' ? 1.0 :
                         formData.region === 'us-west-2' ? 1.05 :
                         formData.region === 'eu-west-1' ? 1.12 :
