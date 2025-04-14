@@ -5,8 +5,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies and recharts explicitly
+RUN npm install && npm install recharts
 
 # Copy source code
 COPY . .
@@ -17,13 +17,10 @@ ENV WDS_SOCKET_PORT=0
 ENV CI=false
 ENV PORT=3000
 
+EXPOSE 3000
+
 # Build the application
 RUN npm run build
 
-# Install serve to run the built application
-RUN npm install -g serve
-
-EXPOSE 3000
-
-# Start the application using serve instead of development server
-CMD ["serve", "-s", "build", "-l", "3000"] 
+# Start the development server with hot-reloading
+CMD ["npm", "start"] 
