@@ -1816,68 +1816,92 @@ function CostCalculator() {
   // Update the total cost calculation to use storageCosts
   const getTotalCost = () => {
     // Network Data Load Cost
-    const networkDataLoadCost = costBreakdown?.breakdown?.pxgrid_cost || 0;
+    const networkDataLoadCost = (
+      ((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : minimalConfig.network_load.messages.events_per_day) * 
+      (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+      minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) / 1000000 * 9.25 * 30 +
+      (networkLoadEnabled ? networkLoadConfig.api.calls_per_day : minimalConfig.network_load.api.calls_per_day) * 
+      (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+      minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) * 0.00189 * 30) *
+      (formData.region === 'us-east-1' ? 1.0 :
+       formData.region === 'us-west-2' ? 1.05 :
+       formData.region === 'eu-west-1' ? 1.12 :
+       formData.region === 'ap-southeast-1' ? 1.15 : 1.0)
+    );
+    
+    // Storage Cost
+    const storageCost = (storageCosts.dynamodb_final_cost || 0) + (storageCosts.s3_final_cost || 0);
+    
+    // Container Cost
+    const containerCost = (73 + (71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100) + 
+      Math.floor((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1) / 1_000_000)))) * (
+        formData.region === 'us-east-1' ? 1.0 :
+        formData.region === 'us-west-2' ? 1.05 :
+        formData.region === 'eu-west-1' ? 1.12 :
+        formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+      );
     
     // Network Costs
     const networkCosts = (costBreakdown?.breakdown?.network?.throughput_cost || 0) + 
                         (costBreakdown?.breakdown?.network?.msk_cost || 0);
     
-    // Container Cost
-    const containerCost = costBreakdown?.breakdown?.container_cost || 0;
+    // Cloud Infrastructure Costs
+    const cloudInfraCost = (32 + 100 + 73 + 15) * (
+      formData.region === 'us-east-1' ? 1.0 :
+      formData.region === 'us-west-2' ? 1.05 :
+      formData.region === 'eu-west-1' ? 1.12 :
+      formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+    );
     
-    // Storage Cost (already monthly)
-    const storageCost = storageCosts.dynamodb_final_cost + storageCosts.s3_final_cost;
+    // Infrastructure Management Costs
+    const infraManagementCost = 3 + 2 + 51 + 222; // Fixed costs
     
-    // Cloud Infrastructure Costs (already monthly)
-    const cloudInfraCost = (costBreakdown?.breakdown?.nat_gateway || 0) +
-                          (costBreakdown?.breakdown?.vpc_endpoints || 0) +
-                          (costBreakdown?.breakdown?.transit_gateway || 0) +
-                          (costBreakdown?.breakdown?.route53 || 0);
+    // Security Costs
+    const securityCost = 3269; // Fixed cost
     
-    // Infrastructure Management Costs (already monthly)
-    const infraManagementCost = (costBreakdown?.breakdown?.terraform_saas || 0) +
-                               (costBreakdown?.breakdown?.gitlab_ci || 0) +
-                               (costBreakdown?.breakdown?.slack_seat || 0);
+    // Monitoring Costs
+    const monitoringCost = 103.333; // Fixed cost
     
-    // Security Costs (already monthly)
-    const securityCost = (costBreakdown?.breakdown?.security_hub || 0) +
-                        (costBreakdown?.breakdown?.waf || 0) +
-                        (costBreakdown?.breakdown?.shield_advanced || 0) +
-                        (costBreakdown?.breakdown?.guard_duty || 0);
+    // Load Balancer Cost
+    const loadBalancerCost = 200.567 * (
+      formData.region === 'us-east-1' ? 1.0 :
+      formData.region === 'us-west-2' ? 1.05 :
+      formData.region === 'eu-west-1' ? 1.12 :
+      formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+    );
     
-    // Monitoring Costs (already monthly)
-    const monitoringCost = (costBreakdown?.breakdown?.cloudwatch_metrics || 0) +
-                          (costBreakdown?.breakdown?.cloudwatch_management || 0) +
-                          (costBreakdown?.breakdown?.systems_manager || 0) +
-                          (costBreakdown?.breakdown?.managed_prometheus || 0);
-    
-    // Load Balancer Cost (already monthly)
-    const loadBalancerCost = costBreakdown?.breakdown?.load_balancer_base || 0;
-    
-    // Container Management Cost (already monthly)
-    const containerManagementCost = (costBreakdown?.breakdown?.ecr || 0) +
-                                  (costBreakdown?.breakdown?.helm_storage || 0) +
-                                  (costBreakdown?.breakdown?.ecs_fargate || 0);
+    // Container Management Cost
+    const containerManagementCost = 100 * (
+      formData.region === 'us-east-1' ? 1.0 :
+      formData.region === 'us-west-2' ? 1.05 :
+      formData.region === 'eu-west-1' ? 1.12 :
+      formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+    );
 
-    // Caching Cost (already monthly)
-    const base_nodes = Math.max(2, Math.ceil(formData.num_tenants / 100));  // 1 node per 100 tenants, minimum 2
-    const nodes_for_load = networkLoadEnabled ? 
-        Math.ceil(networkLoadConfig.messages.events_per_day / 1000000) : 0;  // 1 node per million messages
-    const total_nodes = base_nodes + nodes_for_load;
-    const cachingCost = 300 + (200 * total_nodes); // $300 for ElastiCache + $200 per node for DynamoDB Accelerator
+    // Caching Cost
+    const cachingCost = (
+      (300 * (nodeConfigEnabled ? formData.nodes.elasticache_nodes_per_region : defaultNodeConfig.elasticache_nodes_per_region)) + 
+      (200 * (nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes))
+    ) * (
+      formData.region === 'us-east-1' ? 1.0 :
+      formData.region === 'us-west-2' ? 1.05 :
+      formData.region === 'eu-west-1' ? 1.12 :
+      formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+    );
     
     // Calculate total monthly cost
-    const totalMonthlyCost = networkDataLoadCost +
-                            networkCosts +
-                            containerCost +
-                            storageCost +
-                            cloudInfraCost +
-                            infraManagementCost +
-                            securityCost +
-                            monitoringCost +
-                            loadBalancerCost +
-                            containerManagementCost +
-                            cachingCost;
+    const totalMonthlyCost = 
+      networkDataLoadCost +
+      storageCost +
+      containerCost +
+      networkCosts +
+      cloudInfraCost +
+      infraManagementCost +
+      securityCost +
+      monitoringCost +
+      loadBalancerCost +
+      containerManagementCost +
+      cachingCost;
     
     return totalMonthlyCost;
   };
