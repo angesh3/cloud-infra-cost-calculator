@@ -7,15 +7,19 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+      - "8443:8443"
     volumes:
       - ./backend:/app
+      - ./ssl:/app/ssl
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      - SSL_CERT_FILE=/app/ssl/certificate.crt
+      - SSL_KEY_FILE=/app/ssl/private.key
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      test: ["CMD", "curl", "-f", "https://localhost:8443/docs", "--insecure"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,9 +34,13 @@ services:
         - NODE_ENV=production
     ports:
       - "3000:3000"
+      - "3443:3443"
     environment:
       - NODE_ENV=production
       - NODE_OPTIONS=--max-old-space-size=512
+      - REACT_APP_API_URL=https://localhost:8443
+    volumes:
+      - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       backend:
         condition: service_healthy

@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:18-alpine as builder
 
 WORKDIR /app
 
@@ -16,25 +16,31 @@ RUN npm ci --only=production --legacy-peer-deps
 # Copy source code
 COPY . .
 
-# Set environment variables
-ENV REACT_APP_API_URL=http://localhost:8000
-ENV WDS_SOCKET_PORT=0
-ENV CI=false
-ENV PORT=3000
-
 # Build with optimization flags
 RUN npm run build
 
 # Use nginx to serve the static files
 FROM nginx:alpine
 
+# Install OpenSSL
+RUN apk add --no-cache openssl
+
+# Create SSL directory
+RUN mkdir -p /etc/nginx/ssl
+
+# Generate self-signed certificate
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/nginx/ssl/private.key \
+    -out /etc/nginx/ssl/certificate.crt \
+    -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost"
+
 # Copy the build output
-COPY --from=0 /app/build /usr/share/nginx/html
+COPY --from=builder /app/build /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 3000
+EXPOSE 3000 3443
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"] 
