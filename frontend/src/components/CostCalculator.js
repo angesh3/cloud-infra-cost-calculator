@@ -1577,19 +1577,16 @@ function CostCalculator() {
                             formData.region === 'eu-west-1' ? 1.12 :
                             formData.region === 'ap-southeast-1' ? 1.15 : 1.0;
 
+    // Get the configured number of nodes
+    const elasticache_nodes = nodeConfigEnabled ? formData.nodes.elasticache_nodes_per_region : defaultNodeConfig.elasticache_nodes_per_region;
+    const dynamodb_nodes = nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes;
+
     // Base costs per month
-    const elasticache_base_cost = 300;  // $300 per month for 2 nodes across regions
+    const elasticache_base_cost = 300;  // $300 per node
     const dynamodb_accelerator_cost = 200;  // $200 per node
 
-    // Calculate nodes based on tenant count and load
-    const total_tenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
-    const base_nodes = Math.max(2, Math.ceil(total_tenants / 100));  // 1 node per 100 tenants, minimum 2
-    const nodes_for_load = networkLoadEnabled ? 
-        Math.ceil(networkLoadConfig.messages.events_per_day / 1000000) : 0;  // 1 node per million messages
-    const total_nodes = base_nodes + nodes_for_load;
-
     // Calculate total cost before region multiplier
-    const total_base_cost = elasticache_base_cost + (dynamodb_accelerator_cost * total_nodes);
+    const total_base_cost = (elasticache_base_cost * elasticache_nodes) + (dynamodb_accelerator_cost * dynamodb_nodes);
     const final_cost = total_base_cost * region_multiplier;
 
     return [
@@ -1598,12 +1595,12 @@ function CostCalculator() {
             items: [
                 {
                     label: 'Base Cost',
-                    value: formatCurrency(elasticache_base_cost),
+                    value: formatCurrency(elasticache_base_cost * elasticache_nodes),
                     details: [
                         'Amazon ElastiCache for Redis',
-                        'Base cost: $300 per month',
+                        `Number of nodes: ${elasticache_nodes}`,
+                        `Base cost: $300 per node`,
                         'Includes:',
-                        '- 2 nodes across regions',
                         '- High availability setup',
                         '- Automated backups',
                         '- Monitoring and maintenance'
@@ -1616,19 +1613,18 @@ function CostCalculator() {
             items: [
                 {
                     label: 'Node Configuration',
-                    value: `${total_nodes} nodes`,
+                    value: `${dynamodb_nodes} ${dynamodb_nodes === 1 ? 'node' : 'nodes'}`,
                     details: [
-                        `Base nodes: ${base_nodes} (minimum 2, or 1 per 100 tenants)`,
-                        `Load-based nodes: ${nodes_for_load} (1 per million messages)`,
-                        `Total nodes: ${total_nodes}`
+                        `Configured nodes: ${dynamodb_nodes}`,
+                        'Base cost: $200 per node'
                     ]
                 },
                 {
                     label: 'Base Cost',
-                    value: formatCurrency(dynamodb_accelerator_cost * total_nodes),
+                    value: formatCurrency(dynamodb_accelerator_cost * dynamodb_nodes),
                     details: [
                         'DynamoDB Accelerator',
-                        'Base cost: $200 per node',
+                        `${dynamodb_nodes} ${dynamodb_nodes === 1 ? 'node' : 'nodes'} × $200`,
                         'Includes:',
                         '- In-memory caching',
                         '- Read performance optimization',
@@ -1645,8 +1641,8 @@ function CostCalculator() {
                     label: 'Base cost (before region multiplier)',
                     value: formatCurrency(total_base_cost),
                     details: [
-                        `ElastiCache: ${formatCurrency(elasticache_base_cost)}`,
-                        `DynamoDB Accelerator: ${formatCurrency(dynamodb_accelerator_cost * total_nodes)}`,
+                        `ElastiCache (${elasticache_nodes} ${elasticache_nodes === 1 ? 'node' : 'nodes'}): ${formatCurrency(elasticache_base_cost * elasticache_nodes)}`,
+                        `DynamoDB Accelerator (${dynamodb_nodes} ${dynamodb_nodes === 1 ? 'node' : 'nodes'}): ${formatCurrency(dynamodb_accelerator_cost * dynamodb_nodes)}`,
                         `Total base cost: ${formatCurrency(total_base_cost)}`
                     ]
                 },
@@ -2676,13 +2672,16 @@ function CostCalculator() {
                     <InfoIcon color="action" fontSize="small" />
                   </Box>
                   <Typography variant="body2">
-                    ElastiCache: {formatCurrency(300)}
+                    ElastiCache: {formatCurrency(300 * (nodeConfigEnabled ? formData.nodes.elasticache_nodes_per_region : defaultNodeConfig.elasticache_nodes_per_region))}
                   </Typography>
                   <Typography variant="body2">
-                    DynamoDB Accelerator: {formatCurrency(200 * (nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes))}
+                    DynamoDB Accelerator (DAX): {formatCurrency(200 * (nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes))}
                   </Typography>
                   <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency((300 + (200 * (nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes))) * (
+                    Total: {formatCurrency((
+                      (300 * (nodeConfigEnabled ? formData.nodes.elasticache_nodes_per_region : defaultNodeConfig.elasticache_nodes_per_region)) + 
+                      (200 * (nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes))
+                    ) * (
                       formData.region === 'us-east-1' ? 1.0 :
                       formData.region === 'us-west-2' ? 1.05 :
                       formData.region === 'eu-west-1' ? 1.12 :
