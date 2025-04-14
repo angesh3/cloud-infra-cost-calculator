@@ -26,8 +26,15 @@ yarn-error.log*
 *.swp
 *.swo
 
-# Node modules cache
-frontend/node_modules/.cache/
+# Node modules and cache
+**/node_modules/
+**/.cache/
+.npm
+.yarn
+.pnpm
+.next
+.nuxt
+.cache
 
 # Python
 __pycache__/
@@ -49,16 +56,22 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+.pytest_cache/
+.coverage
+htmlcov/
 
 # Git objects and packs
 .git/objects/pack/
 .git/index.pack
 .git/packed-refs
+*.pack
+*.idx
 
 # Logs and databases
 *.log
 *.sqlite
 *.db
+*.sqlite3
 
 # Environment variables
 .env
@@ -68,9 +81,33 @@ var/
 # Docker
 .docker/
 *.dockerfile
+docker-compose.override.yml
 
-# Python
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local 
+# Build outputs
+dist/
+build/
+out/
+*.min.js
+*.min.css
+
+# Large media files
+*.mp4
+*.mov
+*.wmv
+*.avi
+*.mkv
+*.iso
+*.tar
+*.gz
+*.zip
+*.7z
+*.rar
+
+# Temporary files
+*.tmp
+*.temp
+*~
+*.bak
+*.swp
+.DS_Store
+Thumbs.db 
