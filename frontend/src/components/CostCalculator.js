@@ -799,45 +799,135 @@ function CostCalculator() {
     ];
   };
 
-  const getCloudInfraDetails = (costs) => {
-    if (!costs) return [];
-    
-    const nat_gateway = costs.nat_gateway || 0;
-    const vpc_endpoints = costs.vpc_endpoints || 0;
-    const transit_gateway = costs.transit_gateway || 0;
-    const route53 = costs.route53 || 0;
-    
-    const total = (nat_gateway + vpc_endpoints + transit_gateway + route53) / 12;
-    
+  const getCloudInfraDetails = () => {
+    const region_multiplier = formData.region === 'us-east-1' ? 1.0 :
+                            formData.region === 'us-west-2' ? 1.05 :
+                            formData.region === 'eu-west-1' ? 1.12 :
+                            formData.region === 'ap-southeast-1' ? 1.15 : 1.0;
+
+    // Base costs per month
+    const nat_gateway_cost = 32;      // $32 per month
+    const vpc_endpoints_cost = 100;    // $100 per month
+    const transit_gateway_cost = 73;   // $73 per month
+    const route53_cost = 15;          // $15 per month
+
+    // Calculate total cost before region multiplier
+    const total_base_cost = nat_gateway_cost + vpc_endpoints_cost + transit_gateway_cost + route53_cost;
+    const final_cost = total_base_cost * region_multiplier;
+
     return [
-      {
-        title: 'AWS Cloud Infrastructure Components',
-        items: [
-          {
-            label: 'NAT Gateway',
-            value: safeFormatCurrency(nat_gateway / 12),
-            details: ['$32 per month']
-          },
-          {
-            label: 'VPC Endpoints',
-            value: safeFormatCurrency(vpc_endpoints / 12),
-            details: ['$10 per month']
-          },
-          {
-            label: 'Transit Gateway',
-            value: safeFormatCurrency(transit_gateway / 12),
-            details: ['$3 per month']
-          },
-          {
-            label: 'Route 53',
-            value: safeFormatCurrency(route53 / 12),
-            details: ['$15 per month']
-          }
-        ],
-        total: safeFormatCurrency(total)
-      }
+        {
+            title: 'NAT Gateway Details',
+            items: [
+                {
+                    label: 'NAT Gateway Base Cost',
+                    value: formatCurrency(nat_gateway_cost),
+                    details: [
+                        'NAT Gateway for outbound internet access',
+                        'Base cost: $32 per month',
+                        'Includes:',
+                        '- NAT Gateway hourly charges ($0.045 per hour)',
+                        '- Data processing fees ($0.045 per GB)',
+                        '- High availability configuration across AZs'
+                    ]
+                }
+            ]
+        },
+        {
+            title: 'VPC Endpoints Details',
+            items: [
+                {
+                    label: 'VPC Endpoints Base Cost',
+                    value: formatCurrency(vpc_endpoints_cost),
+                    details: [
+                        'VPC Interface Endpoints',
+                        'Base cost: $100 per month',
+                        'Includes:',
+                        '- Interface endpoints for AWS services ($0.014 per endpoint-hour)',
+                        '- Data processing through endpoints ($0.01 per GB)',
+                        '- High availability across AZs',
+                        '- Support for multiple services (S3, DynamoDB, etc.)'
+                    ]
+                }
+            ]
+        },
+        {
+            title: 'Transit Gateway Details',
+            items: [
+                {
+                    label: 'Transit Gateway Base Cost',
+                    value: formatCurrency(transit_gateway_cost),
+                    details: [
+                        'AWS Transit Gateway',
+                        'Base cost: $73 per month',
+                        'Includes:',
+                        '- Transit Gateway hourly charges ($0.05 per hour)',
+                        '- VPC attachment costs ($0.05 per attachment-hour)',
+                        '- Data processing ($0.02 per GB)',
+                        '- Inter-VPC routing capabilities'
+                    ]
+                }
+            ]
+        },
+        {
+            title: 'Route 53 Details',
+            items: [
+                {
+                    label: 'Route 53 Base Cost',
+                    value: formatCurrency(route53_cost),
+                    details: [
+                        'Amazon Route 53 DNS Service',
+                        'Base cost: $15 per month',
+                        'Includes:',
+                        '- Hosted zone maintenance ($0.50 per hosted zone)',
+                        '- DNS queries ($0.40 per million queries)',
+                        '- Health checks ($0.50 per health check)',
+                        '- DNS failover configuration'
+                    ]
+                }
+            ]
+        },
+        {
+            title: 'Cost Summary',
+            items: [
+                {
+                    label: 'Base Costs Breakdown',
+                    value: formatCurrency(total_base_cost),
+                    details: [
+                        `NAT Gateway: ${formatCurrency(nat_gateway_cost)}`,
+                        `VPC Endpoints: ${formatCurrency(vpc_endpoints_cost)}`,
+                        `Transit Gateway: ${formatCurrency(transit_gateway_cost)}`,
+                        `Route 53: ${formatCurrency(route53_cost)}`,
+                        `Total base cost: ${formatCurrency(total_base_cost)}`
+                    ]
+                },
+                {
+                    label: `Region Multiplier (${formData.region})`,
+                    value: `${region_multiplier}x`,
+                    details: [
+                        `Selected region: ${formData.region}`,
+                        `Region multiplier: ${region_multiplier}x`,
+                        'Region multipliers:',
+                        '- us-east-1: 1.00x (base)',
+                        '- us-west-2: 1.05x',
+                        '- eu-west-1: 1.12x',
+                        '- ap-southeast-1: 1.15x'
+                    ]
+                },
+                {
+                    label: 'Final Monthly Cost',
+                    value: formatCurrency(final_cost),
+                    details: [
+                        `Base cost: ${formatCurrency(total_base_cost)}`,
+                        `Region multiplier: ${region_multiplier}x`,
+                        `Final cost = ${formatCurrency(total_base_cost)} × ${region_multiplier}`,
+                        `= ${formatCurrency(final_cost)}`
+                    ]
+                }
+            ]
+        }
     ];
-  };
+};
 
   const getInfraManagementDetails = (costs) => {
     if (!costs) return [];
@@ -1292,8 +1382,8 @@ function CostCalculator() {
         details = getNetworkDetails(data);
         title = 'Network Cost Details';
         break;
-      case 'cloud_infra':
-        details = getCloudInfraDetails(costBreakdown?.breakdown);
+      case 'cloud_infrastructure':
+        details = getCloudInfraDetails();
         title = 'AWS Cloud Infrastructure Details';
         break;
       case 'infra_management':
@@ -1948,24 +2038,32 @@ function CostCalculator() {
                     cursor: 'pointer',
                     '&:hover': { bgcolor: 'action.hover' }
                   }}
-                  onClick={() => handleShowDetails('cloud_infra')}
+                  onClick={() => handleShowDetails('cloud_infrastructure')}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Typography variant="subtitle1">AWS Cloud Infrastructure</Typography>
                     <InfoIcon color="action" fontSize="small" />
                   </Box>
                   <Typography variant="body2">
-                    NAT Gateway: {safeFormatCurrency((costBreakdown?.breakdown?.nat_gateway || 0) / 12)}
+                    NAT Gateway: {formatCurrency(32)}
                   </Typography>
                   <Typography variant="body2">
-                    VPC Endpoints: {safeFormatCurrency((costBreakdown?.breakdown?.vpc_endpoints || 0) / 12)}
+                    VPC Endpoints: {formatCurrency(100)}
+                  </Typography>
+                  <Typography variant="body2">
+                    Transit Gateway: {formatCurrency(73)}
+                  </Typography>
+                  <Typography variant="body2">
+                    Route 53: {formatCurrency(15)}
                   </Typography>
                   <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {safeFormatCurrency(
-                      ((costBreakdown?.breakdown?.nat_gateway || 0) + 
-                       (costBreakdown?.breakdown?.vpc_endpoints || 0) +
-                       (costBreakdown?.breakdown?.transit_gateway || 0) +
-                       (costBreakdown?.breakdown?.route53 || 0)) / 12
+                    Total: {formatCurrency(
+                      (32 + 100 + 73 + 15) * (
+                        formData.region === 'us-east-1' ? 1.0 :
+                        formData.region === 'us-west-2' ? 1.05 :
+                        formData.region === 'eu-west-1' ? 1.12 :
+                        formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+                      )
                     )}
                   </Typography>
                 </Paper>
