@@ -41,6 +41,10 @@ function CostCalculator() {
     endpoints_per_tenant: 10000
   };
 
+  const defaultNodeConfig = {
+    nodes_per_region: 2
+  };
+
   const defaultNetworkConfig = {
     api: {
       calls_per_day: 189,
@@ -103,11 +107,14 @@ function CostCalculator() {
   const [formData, setFormData] = useState({
     cloud_provider: 'aws',
     region: 'us-west-2',
-    scale: defaultScaleConfig
+    scale: defaultScaleConfig,
+    nodes: defaultNodeConfig
   });
 
   const [scaleConfigEnabled, setScaleConfigEnabled] = useState(false);
   const [scaleConfigModalOpen, setScaleConfigModalOpen] = useState(false);
+  const [nodeConfigEnabled, setNodeConfigEnabled] = useState(false);
+  const [nodeConfigModalOpen, setNodeConfigModalOpen] = useState(false);
   const [networkLoadEnabled, setNetworkLoadEnabled] = useState(false);
   const [networkLoadModalOpen, setNetworkLoadModalOpen] = useState(false);
   const [networkLoadConfig, setNetworkLoadConfig] = useState(defaultNetworkConfig);
@@ -151,6 +158,13 @@ function CostCalculator() {
     }
   };
 
+  const handleNodeConfigChange = (event) => {
+    setNodeConfigEnabled(event.target.checked);
+    if (event.target.checked) {
+      setNodeConfigModalOpen(true);
+    }
+  };
+
   const handleNetworkLoadChange = (event) => {
     setNetworkLoadEnabled(event.target.checked);
     if (event.target.checked) {
@@ -185,6 +199,16 @@ function CostCalculator() {
       
       return updatedData;
     });
+  };
+
+  const handleNodeInputChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      nodes: {
+        ...prev.nodes,
+        [field]: parseInt(value) || 0
+      }
+    }));
   };
 
   const calculateCostsWithData = async (data) => {
@@ -1544,6 +1568,92 @@ function CostCalculator() {
     ];
 };
 
+  const getCachingDetails = (costs) => {
+    if (!costs) return [];
+    
+    const region_multiplier = formData.region === 'us-east-1' ? 1.0 :
+                            formData.region === 'us-west-2' ? 1.05 :
+                            formData.region === 'eu-west-1' ? 1.12 :
+                            formData.region === 'ap-southeast-1' ? 1.15 : 1.0;
+
+    // Base costs per month
+    const elasticache_base_cost = 300;  // $300 per month for 2 nodes across regions
+    const dynamodb_accelerator_cost = 200;  // $200 per node
+
+    // Calculate total cost before region multiplier
+    const total_base_cost = elasticache_base_cost + dynamodb_accelerator_cost;
+    const final_cost = total_base_cost * region_multiplier;
+
+    return [
+        {
+            title: 'ElastiCache (Redis)',
+            items: [
+                {
+                    label: 'Base Cost',
+                    value: formatCurrency(elasticache_base_cost),
+                    details: [
+                        'Amazon ElastiCache for Redis',
+                        'Base cost: $300 per month',
+                        'Includes:',
+                        '- 2 nodes across regions',
+                        '- High availability setup',
+                        '- Automated backups',
+                        '- Monitoring and maintenance'
+                    ]
+                }
+            ]
+        },
+        {
+            title: 'DynamoDB Accelerator (DAX)',
+            items: [
+                {
+                    label: 'Base Cost',
+                    value: formatCurrency(dynamodb_accelerator_cost),
+                    details: [
+                        'DynamoDB Accelerator',
+                        'Base cost: $200 per node',
+                        'Includes:',
+                        '- In-memory caching',
+                        '- Read performance optimization',
+                        '- Reduced latency',
+                        '- Automatic scaling'
+                    ]
+                }
+            ]
+        },
+        {
+            title: 'Cost Summary',
+            items: [
+                {
+                    label: 'Base cost (before region multiplier)',
+                    value: formatCurrency(total_base_cost),
+                    details: [
+                        `ElastiCache: ${formatCurrency(elasticache_base_cost)}`,
+                        `DynamoDB Accelerator: ${formatCurrency(dynamodb_accelerator_cost)}`,
+                        `Total base cost: ${formatCurrency(total_base_cost)}`
+                    ]
+                },
+                {
+                    label: `Region multiplier (${formData.region})`,
+                    value: `${region_multiplier}x`,
+                    details: [
+                        `Selected region: ${formData.region}`,
+                        `Multiplier: ${region_multiplier}x`
+                    ]
+                },
+                {
+                    label: 'Final monthly cost',
+                    value: formatCurrency(final_cost),
+                    details: [
+                        `${formatCurrency(total_base_cost)} × ${region_multiplier}`,
+                        `= ${formatCurrency(final_cost)}`
+                    ]
+                }
+            ]
+        }
+    ];
+  };
+
   const handleShowDetails = (type, data) => {
     let details;
     let title;
@@ -1588,6 +1698,10 @@ function CostCalculator() {
       case 'container_management':
         details = getContainerManagementDetails(costBreakdown?.breakdown);
         title = 'Container Management Details';
+        break;
+      case 'caching':
+        details = getCachingDetails(costBreakdown?.breakdown);
+        title = 'Caching Details';
         break;
       default:
         details = [];
@@ -1731,6 +1845,9 @@ function CostCalculator() {
     const containerManagementCost = (costBreakdown?.breakdown?.ecr || 0) +
                                   (costBreakdown?.breakdown?.helm_storage || 0) +
                                   (costBreakdown?.breakdown?.ecs_fargate || 0);
+
+    // Caching Cost (already monthly)
+    const cachingCost = 500; // $300 for ElastiCache + $200 for DynamoDB Accelerator
     
     // Calculate total monthly cost
     const totalMonthlyCost = networkDataLoadCost +
@@ -1742,7 +1859,8 @@ function CostCalculator() {
                             securityCost +
                             monitoringCost +
                             loadBalancerCost +
-                            containerManagementCost;
+                            containerManagementCost +
+                            cachingCost;
     
     return totalMonthlyCost;
   };
@@ -1877,6 +1995,24 @@ function CostCalculator() {
                 </Box>
               }
             />
+
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={nodeConfigEnabled}
+                  onChange={handleNodeConfigChange}
+                  color="primary"
+                />
+              }
+              label={
+                <Box>
+                  <Typography variant="body1">Configure Node Parameters</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {nodeConfigEnabled ? 'Using custom configuration' : 'Using default values (2 nodes per region)'}
+                  </Typography>
+                </Box>
+              }
+            />
           </Stack>
 
           <Modal
@@ -1950,6 +2086,67 @@ function CostCalculator() {
                   onClick={() => setScaleConfigModalOpen(false)}
                 >
                   Save Configuration
+                </Button>
+              </Box>
+            </Box>
+          </Modal>
+
+          <Modal
+            open={nodeConfigModalOpen}
+            onClose={() => setNodeConfigModalOpen(false)}
+          >
+            <Box sx={modalStyle}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">Node Parameters Configuration</Typography>
+                <IconButton onClick={() => setNodeConfigModalOpen(false)} size="small">
+                  <CloseIcon />
+                </IconButton>
+              </Box>
+
+              <TableContainer component={Paper} sx={{ mb: 3 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>S.No</TableCell>
+                      <TableCell>Node Parameters</TableCell>
+                      <TableCell>Count</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell>1</TableCell>
+                      <TableCell>Nodes per Region</TableCell>
+                      <TableCell>
+                        <TextField
+                          type="number"
+                          value={formData.nodes.nodes_per_region}
+                          onChange={(e) => handleNodeInputChange('nodes_per_region', e.target.value)}
+                          size="small"
+                          inputProps={{ min: 1 }}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setFormData(prev => ({
+                      ...prev,
+                      nodes: defaultNodeConfig
+                    }));
+                  }}
+                >
+                  Reset to Default
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={() => setNodeConfigModalOpen(false)}
+                >
+                  Apply
                 </Button>
               </Box>
             </Box>
@@ -2433,6 +2630,36 @@ function CostCalculator() {
                   </Typography>
                   <Typography variant="h6" sx={{ mt: 1 }}>
                     Total: {formatCurrency(100 * (
+                      formData.region === 'us-east-1' ? 1.0 :
+                      formData.region === 'us-west-2' ? 1.05 :
+                      formData.region === 'eu-west-1' ? 1.12 :
+                      formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+                    ))}
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper 
+                  elevation={2} 
+                  sx={{ 
+                    p: 2, 
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'action.hover' }
+                  }}
+                  onClick={() => handleShowDetails('caching')}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="subtitle1">Caching</Typography>
+                    <InfoIcon color="action" fontSize="small" />
+                  </Box>
+                  <Typography variant="body2">
+                    ElastiCache: {formatCurrency(300)}
+                  </Typography>
+                  <Typography variant="body2">
+                    DynamoDB Accelerator: {formatCurrency(200)}
+                  </Typography>
+                  <Typography variant="h6" sx={{ mt: 1 }}>
+                    Total: {formatCurrency(500 * (
                       formData.region === 'us-east-1' ? 1.0 :
                       formData.region === 'us-west-2' ? 1.05 :
                       formData.region === 'eu-west-1' ? 1.12 :
