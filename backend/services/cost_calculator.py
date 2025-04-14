@@ -385,28 +385,69 @@ class CostCalculator:
             network_costs = self.calculate_network_costs(deployment, provider)
             print(f"Base Network costs: {network_costs}")
 
-            # Calculate total base cost
-            total_base_cost = (
+            # Infrastructure component costs (monthly values)
+            nat_gateway = 32
+            vpc_endpoints = 10
+            transit_gateway = 3
+            route53 = 15
+            
+            terraform_saas = 12
+            gitlab_ci = 21
+            slack_seat = 2
+            
+            security_hub = 40
+            waf = 25
+            shield_advanced = 300
+            guard_duty = 12
+            
+            cloudwatch_metrics = 20
+            cloudwatch_management = 3.33
+            systems_manager = 30
+            managed_prometheus = 50
+            
+            load_balancer_base = 100
+            
+            ecr = 50
+            helm_storage = 10
+            ecs_fargate = 40
+
+            # Calculate monthly infrastructure costs
+            monthly_aws_infra = nat_gateway + vpc_endpoints + transit_gateway + route53
+            monthly_infra_mgmt = terraform_saas + gitlab_ci + slack_seat
+            monthly_security = security_hub + waf + shield_advanced + guard_duty
+            monthly_monitoring = cloudwatch_metrics + cloudwatch_management + systems_manager + managed_prometheus
+            monthly_load_balancer = load_balancer_base
+            monthly_container = ecr + helm_storage + ecs_fargate
+
+            # Calculate total monthly base cost
+            total_monthly_base_cost = (
                 pxgrid_cost +
                 storage_costs['dynamodb_cost'] +
                 storage_costs['s3_cost'] +
                 container_cost +
                 network_costs['throughput_cost'] +
-                network_costs['msk_cost']
+                network_costs['msk_cost'] +
+                monthly_aws_infra +
+                monthly_infra_mgmt +
+                monthly_security +
+                monthly_monitoring +
+                monthly_load_balancer +
+                monthly_container
             )
             
-            print(f"Total cost before region multiplier: {total_base_cost}")
+            print(f"Total monthly cost before region multiplier: {total_monthly_base_cost}")
             
             # Apply region multiplier to total cost
-            total_cost = total_base_cost * multiplier
-            print(f"Final total cost after multiplier: {total_cost}")
+            total_monthly_cost = total_monthly_base_cost * multiplier
+            print(f"Final total monthly cost after multiplier: {total_monthly_cost}")
 
             # Calculate cost per tenant with multiplier applied
-            monthly_cost_per_tenant = total_cost / deployment['num_tenants'] if deployment['num_tenants'] > 0 else 0
+            monthly_cost_per_tenant = total_monthly_cost / deployment['num_tenants'] if deployment['num_tenants'] > 0 else 0
 
             # Return costs with multiplier applied to each component
             return {
-                'total_cost': total_cost,
+                'total_cost': total_monthly_cost * 12,  # Convert to yearly for consistency
+                'monthly_cost': total_monthly_cost,
                 'monthly_cost_per_tenant': monthly_cost_per_tenant,
                 'breakdown': {
                     'pxgrid_cost': pxgrid_cost * multiplier,
@@ -418,7 +459,32 @@ class CostCalculator:
                     'network': {
                         'throughput_cost': network_costs['throughput_cost'] * multiplier,
                         'msk_cost': network_costs['msk_cost'] * multiplier
-                    }
+                    },
+                    # Infrastructure components (monthly costs)
+                    'nat_gateway': nat_gateway,
+                    'vpc_endpoints': vpc_endpoints,
+                    'transit_gateway': transit_gateway,
+                    'route53': route53,
+                    
+                    'terraform_saas': terraform_saas,
+                    'gitlab_ci': gitlab_ci,
+                    'slack_seat': slack_seat,
+                    
+                    'security_hub': security_hub,
+                    'waf': waf,
+                    'shield_advanced': shield_advanced,
+                    'guard_duty': guard_duty,
+                    
+                    'cloudwatch_metrics': cloudwatch_metrics,
+                    'cloudwatch_management': cloudwatch_management,
+                    'systems_manager': systems_manager,
+                    'managed_prometheus': managed_prometheus,
+                    
+                    'load_balancer_base': load_balancer_base,
+                    
+                    'ecr': ecr,
+                    'helm_storage': helm_storage,
+                    'ecs_fargate': ecs_fargate
                 },
                 'metadata': {
                     'provider': provider,

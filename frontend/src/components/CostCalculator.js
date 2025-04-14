@@ -301,6 +301,14 @@ function CostCalculator() {
     return `$${(Number(value) * multiplier).toFixed(3)}`;
   };
 
+  // Add a safe number formatting helper
+  const safeFormatCurrency = (value) => {
+    if (value === undefined || value === null || isNaN(value)) {
+      return '$0.00';
+    }
+    return formatCurrency(value);
+  };
+
   const getDynamoDBDetails = (dynamodb_cost, formData) => {
     const region_multiplier = formData.region === 'us-east-1' ? 1.0 :
                             formData.region === 'us-west-2' ? 1.05 :
@@ -750,6 +758,306 @@ function CostCalculator() {
     ];
   };
 
+  const getCloudInfraDetails = (costs) => {
+    if (!costs) return [];
+    
+    const nat_gateway = costs.nat_gateway || 0;
+    const vpc_endpoints = costs.vpc_endpoints || 0;
+    const transit_gateway = costs.transit_gateway || 0;
+    const route53 = costs.route53 || 0;
+    
+    const total = (nat_gateway + vpc_endpoints + transit_gateway + route53) / 12;
+    
+    return [
+      {
+        title: 'AWS Cloud Infrastructure Components',
+        items: [
+          {
+            label: 'NAT Gateway',
+            value: safeFormatCurrency(nat_gateway / 12),
+            details: ['$32 per month']
+          },
+          {
+            label: 'VPC Endpoints',
+            value: safeFormatCurrency(vpc_endpoints / 12),
+            details: ['$10 per month']
+          },
+          {
+            label: 'Transit Gateway',
+            value: safeFormatCurrency(transit_gateway / 12),
+            details: ['$3 per month']
+          },
+          {
+            label: 'Route 53',
+            value: safeFormatCurrency(route53 / 12),
+            details: ['$15 per month']
+          }
+        ],
+        total: safeFormatCurrency(total)
+      }
+    ];
+  };
+
+  const getInfraManagementDetails = (costs) => {
+    if (!costs) return [];
+    
+    const terraform = costs.terraform_saas || 0;
+    const gitlab = costs.gitlab_ci || 0;
+    const slack = costs.slack_seat || 0;
+    
+    const total = (terraform + gitlab + slack) / 12;
+    
+    return [
+      {
+        title: 'Infrastructure Management Tools',
+        items: [
+          {
+            label: 'Terraform (SaaS)',
+            value: safeFormatCurrency(terraform / 12),
+            details: ['$12 per month']
+          },
+          {
+            label: 'GitLab CI Pipeline',
+            value: safeFormatCurrency(gitlab / 12),
+            details: ['$21 per month']
+          },
+          {
+            label: 'Slack (1 seat)',
+            value: safeFormatCurrency(slack / 12),
+            details: ['$2 per month']
+          }
+        ],
+        total: safeFormatCurrency(total)
+      }
+    ];
+  };
+
+  const getSecurityToolsDetails = (costs) => {
+    if (!costs) return [];
+    
+    const security_hub = costs.security_hub || 0;
+    const waf = costs.waf || 0;
+    const shield = costs.shield_advanced || 0;
+    const guard_duty = costs.guard_duty || 0;
+    
+    const total = (security_hub + waf + shield + guard_duty) / 12;
+    
+    return [
+      {
+        title: 'Security Tools',
+        items: [
+          {
+            label: 'Security Hub',
+            value: safeFormatCurrency(security_hub / 12),
+            details: ['$40 per month']
+          },
+          {
+            label: 'WAF',
+            value: safeFormatCurrency(waf / 12),
+            details: ['$25 per month']
+          },
+          {
+            label: 'Shield Advanced',
+            value: safeFormatCurrency(shield / 12),
+            details: ['$300 per month']
+          },
+          {
+            label: 'GuardDuty',
+            value: safeFormatCurrency(guard_duty / 12),
+            details: ['$12 per month']
+          }
+        ],
+        total: safeFormatCurrency(total)
+      }
+    ];
+  };
+
+  const getMonitoringDetails = (costs) => {
+    if (!costs) return [];
+    
+    // Get current configuration values based on enabled flags
+    const total_tenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
+    const endpoints_per_tenant = scaleConfigEnabled ? formData.scale.endpoints_per_tenant : minimalConfig.scale.endpoints_per_tenant;
+    const total_endpoints = total_tenants * endpoints_per_tenant;
+    
+    // Calculate daily events for monitoring
+    const daily_messages = networkLoadEnabled ? networkLoadConfig.messages.events_per_day : minimalConfig.network_load.messages.events_per_day;
+    const daily_api_calls = networkLoadEnabled ? networkLoadConfig.api.calls_per_day : minimalConfig.network_load.api.calls_per_day;
+    const total_daily_events = daily_messages + daily_api_calls;
+    
+    // Base costs (annual) - use minimal values if configurations are disabled
+    const base_cloudwatch_metrics = 240; // $20 per month * 12
+    const base_cloudwatch_management = 40; // $3.33 per month * 12
+    const base_systems_manager = 360; // $30 per month * 12
+    const base_prometheus = 600; // $50 per month * 12
+
+    // Use minimal costs when configurations are disabled
+    const cloudwatch_metrics = scaleConfigEnabled ? (costs.cloudwatch_metrics || base_cloudwatch_metrics) : base_cloudwatch_metrics;
+    const cloudwatch_management = scaleConfigEnabled ? (costs.cloudwatch_management || base_cloudwatch_management) : base_cloudwatch_management;
+    const systems_manager = scaleConfigEnabled ? (costs.systems_manager || base_systems_manager) : base_systems_manager;
+    const prometheus = scaleConfigEnabled ? (costs.managed_prometheus || base_prometheus) : base_prometheus;
+    
+    // Calculate metric counts and adjustments
+    const base_metrics_per_endpoint = 5; // Basic metrics per endpoint
+    const total_metrics = total_endpoints * base_metrics_per_endpoint;
+    const metrics_cost_multiplier = scaleConfigEnabled ? Math.max(1, Math.ceil(total_metrics / 20000)) : 1; // Each 20K metrics tier
+    
+    // Adjust costs based on scale and load
+    const adjusted_cloudwatch = cloudwatch_metrics * metrics_cost_multiplier;
+    const adjusted_prometheus = prometheus * (scaleConfigEnabled ? Math.max(1, Math.ceil(total_endpoints / 1000)) : 1);
+    
+    // Calculate monthly costs
+    const monthly_cloudwatch = adjusted_cloudwatch / 12;
+    const monthly_cloudwatch_mgmt = cloudwatch_management / 12;
+    const monthly_systems_manager = (systems_manager * (scaleConfigEnabled ? Math.max(1, Math.ceil(total_tenants / 100)) : 1)) / 12;
+    const monthly_prometheus = adjusted_prometheus / 12;
+    
+    const total = monthly_cloudwatch + monthly_cloudwatch_mgmt + monthly_systems_manager + monthly_prometheus;
+    
+    return [
+      {
+        title: 'Scale-Based Metrics',
+        items: [
+          {
+            label: 'Total Endpoints Monitored',
+            value: total_endpoints.toLocaleString(),
+            details: [
+              `Configuration: ${scaleConfigEnabled ? 'Custom' : 'Minimal'}`,
+              `Tenants: ${total_tenants.toLocaleString()}`,
+              `Endpoints per tenant: ${endpoints_per_tenant.toLocaleString()}`,
+              `Total endpoints: ${total_endpoints.toLocaleString()}`
+            ]
+          },
+          {
+            label: 'Total Daily Events',
+            value: total_daily_events.toLocaleString(),
+            details: [
+              `Configuration: ${networkLoadEnabled ? 'Custom' : 'Minimal'}`,
+              `Daily messages: ${daily_messages.toLocaleString()}`,
+              `Daily API calls: ${daily_api_calls.toLocaleString()}`,
+              `Total events: ${total_daily_events.toLocaleString()}`
+            ]
+          }
+        ]
+      },
+      {
+        title: 'CloudWatch Costs',
+        items: [
+          {
+            label: 'CloudWatch Metrics',
+            value: formatCurrency(monthly_cloudwatch),
+            details: [
+              `Configuration: ${scaleConfigEnabled ? 'Custom' : 'Minimal'}`,
+              `Base cost: $20 per month for 20K metrics`,
+              `Total metrics: ${total_metrics.toLocaleString()}`,
+              `Metrics multiplier: ${metrics_cost_multiplier}x`,
+              `Adjusted monthly cost: ${formatCurrency(monthly_cloudwatch)}`
+            ]
+          },
+          {
+            label: 'CloudWatch Management',
+            value: formatCurrency(monthly_cloudwatch_mgmt),
+            details: [
+              `Configuration: ${scaleConfigEnabled ? 'Custom' : 'Minimal'}`,
+              'Base cost: $3.33 per month'
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Systems Manager & Prometheus',
+        items: [
+          {
+            label: 'Systems Manager',
+            value: formatCurrency(monthly_systems_manager),
+            details: [
+              `Configuration: ${scaleConfigEnabled ? 'Custom' : 'Minimal'}`,
+              `Base cost: $30 per month per 100 tenants`,
+              `Total tenants: ${total_tenants.toLocaleString()}`,
+              `Tenant multiplier: ${scaleConfigEnabled ? Math.max(1, Math.ceil(total_tenants / 100)) : 1}x`,
+              `Adjusted monthly cost: ${formatCurrency(monthly_systems_manager)}`
+            ]
+          },
+          {
+            label: 'Managed Prometheus',
+            value: formatCurrency(monthly_prometheus),
+            details: [
+              `Configuration: ${scaleConfigEnabled ? 'Custom' : 'Minimal'}`,
+              `Base cost: $50 per month per 1000 endpoints`,
+              `Total endpoints: ${total_endpoints.toLocaleString()}`,
+              `Endpoint multiplier: ${scaleConfigEnabled ? Math.max(1, Math.ceil(total_endpoints / 1000)) : 1}x`,
+              `Adjusted monthly cost: ${formatCurrency(monthly_prometheus)}`
+            ]
+          }
+        ]
+      },
+      {
+        title: 'Total Monitoring Costs',
+        items: [
+          {
+            label: 'Total Monthly Cost',
+            value: formatCurrency(total),
+            details: [
+              `Configuration: ${scaleConfigEnabled ? 'Custom' : 'Minimal'}`,
+              `CloudWatch Metrics: ${formatCurrency(monthly_cloudwatch)}`,
+              `CloudWatch Management: ${formatCurrency(monthly_cloudwatch_mgmt)}`,
+              `Systems Manager: ${formatCurrency(monthly_systems_manager)}`,
+              `Managed Prometheus: ${formatCurrency(monthly_prometheus)}`,
+              `Total: ${formatCurrency(total)}`
+            ]
+          }
+        ]
+      }
+    ];
+  };
+
+  const getLoadBalancerDetails = (costs) => {
+    if (!costs) return [];
+    
+    return [
+      {
+        title: 'API & Load Balancing',
+        items: [
+          {
+            label: 'Load Balancer',
+            value: formatCurrency(costs.load_balancer_base / 12),
+            details: [
+              'Base cost: $100 per month',
+              'Includes Application Load Balancer and request costs'
+            ]
+          }
+        ]
+      }
+    ];
+  };
+
+  const getContainerManagementDetails = (costs) => {
+    if (!costs) return [];
+    
+    return [
+      {
+        title: 'Container Management',
+        items: [
+          {
+            label: 'ECR',
+            value: formatCurrency(costs.ecr / 12),
+            details: ['$50 per month']
+          },
+          {
+            label: 'Helm Chart Storage',
+            value: formatCurrency(costs.helm_storage / 12),
+            details: ['$10 per month']
+          },
+          {
+            label: 'ECS Fargate',
+            value: formatCurrency(costs.ecs_fargate / 12),
+            details: ['$40 per month']
+          }
+        ]
+      }
+    ];
+  };
+
   const handleShowDetails = (type, data) => {
     let details;
     let title;
@@ -770,6 +1078,30 @@ function CostCalculator() {
       case 'network':
         details = getNetworkDetails(data);
         title = 'Network Cost Details';
+        break;
+      case 'cloud_infra':
+        details = getCloudInfraDetails(costBreakdown?.breakdown);
+        title = 'AWS Cloud Infrastructure Details';
+        break;
+      case 'infra_management':
+        details = getInfraManagementDetails(costBreakdown?.breakdown);
+        title = 'Infrastructure Management Details';
+        break;
+      case 'security':
+        details = getSecurityToolsDetails(costBreakdown?.breakdown);
+        title = 'Security Tools Details';
+        break;
+      case 'monitoring':
+        details = getMonitoringDetails(costBreakdown?.breakdown);
+        title = 'Monitoring Services Details';
+        break;
+      case 'load_balancer':
+        details = getLoadBalancerDetails(costBreakdown?.breakdown);
+        title = 'API & Load Balancing Details';
+        break;
+      case 'container_management':
+        details = getContainerManagementDetails(costBreakdown?.breakdown);
+        title = 'Container Management Details';
         break;
       default:
         details = [];
@@ -870,12 +1202,85 @@ function CostCalculator() {
 
   // Update the total cost calculation to use storageCosts
   const getTotalCost = () => {
-    return (
-      (costBreakdown?.breakdown?.pxgrid_cost || 0) +
-      ((costBreakdown?.breakdown?.network?.throughput_cost || 0) + (costBreakdown?.breakdown?.network?.msk_cost || 0)) +
-      (costBreakdown?.breakdown?.container_cost || 0) +
-      (storageCosts.dynamodb_final_cost + storageCosts.s3_final_cost)
-    );
+    // Network Data Load Cost
+    const networkDataLoadCost = costBreakdown?.breakdown?.pxgrid_cost || 0;
+    
+    // Network Costs
+    const networkCosts = (costBreakdown?.breakdown?.network?.throughput_cost || 0) + 
+                        (costBreakdown?.breakdown?.network?.msk_cost || 0);
+    
+    // Container Cost
+    const containerCost = costBreakdown?.breakdown?.container_cost || 0;
+    
+    // Storage Cost
+    const storageCost = storageCosts.dynamodb_final_cost + storageCosts.s3_final_cost;
+    
+    // Cloud Infrastructure Costs (divided by 12 to get monthly values)
+    const cloudInfraCost = ((costBreakdown?.breakdown?.nat_gateway || 0) +
+                           (costBreakdown?.breakdown?.vpc_endpoints || 0) +
+                           (costBreakdown?.breakdown?.transit_gateway || 0) +
+                           (costBreakdown?.breakdown?.route53 || 0)) / 12;
+    
+    // Infrastructure Management Costs
+    const infraManagementCost = ((costBreakdown?.breakdown?.terraform_saas || 0) +
+                                (costBreakdown?.breakdown?.gitlab_ci || 0) +
+                                (costBreakdown?.breakdown?.slack_seat || 0)) / 12;
+    
+    // Security Costs
+    const securityCost = ((costBreakdown?.breakdown?.security_hub || 0) +
+                         (costBreakdown?.breakdown?.waf || 0) +
+                         (costBreakdown?.breakdown?.shield_advanced || 0) +
+                         (costBreakdown?.breakdown?.guard_duty || 0)) / 12;
+    
+    // Calculate monitoring costs
+    const total_tenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
+    const endpoints_per_tenant = scaleConfigEnabled ? formData.scale.endpoints_per_tenant : minimalConfig.scale.endpoints_per_tenant;
+    const total_endpoints = total_tenants * endpoints_per_tenant;
+    
+    // Base monitoring costs (annual)
+    const base_cloudwatch_metrics = 240; // $20 per month * 12
+    const base_cloudwatch_management = 40; // $3.33 per month * 12
+    const base_systems_manager = 360; // $30 per month * 12
+    const base_prometheus = 600; // $50 per month * 12
+
+    // Use minimal costs when configurations are disabled
+    const cloudwatch_metrics = scaleConfigEnabled ? (costBreakdown?.breakdown?.cloudwatch_metrics || base_cloudwatch_metrics) : base_cloudwatch_metrics;
+    const cloudwatch_management = scaleConfigEnabled ? (costBreakdown?.breakdown?.cloudwatch_management || base_cloudwatch_management) : base_cloudwatch_management;
+    const systems_manager = scaleConfigEnabled ? (costBreakdown?.breakdown?.systems_manager || base_systems_manager) : base_systems_manager;
+    const prometheus = scaleConfigEnabled ? (costBreakdown?.breakdown?.managed_prometheus || base_prometheus) : base_prometheus;
+    
+    // Calculate multipliers
+    const metrics_cost_multiplier = scaleConfigEnabled ? Math.max(1, Math.ceil(total_endpoints * 5 / 20000)) : 1;
+    const tenant_multiplier = scaleConfigEnabled ? Math.max(1, Math.ceil(total_tenants / 100)) : 1;
+    const endpoint_multiplier = scaleConfigEnabled ? Math.max(1, Math.ceil(total_endpoints / 1000)) : 1;
+    
+    // Calculate final monitoring costs (monthly)
+    const monitoringCost = ((cloudwatch_metrics * metrics_cost_multiplier) +
+                           cloudwatch_management +
+                           (systems_manager * tenant_multiplier) +
+                           (prometheus * endpoint_multiplier)) / 12;
+    
+    // Load Balancer Cost
+    const loadBalancerCost = (costBreakdown?.breakdown?.load_balancer_base || 0) / 12;
+    
+    // Container Management Cost
+    const containerManagementCost = ((costBreakdown?.breakdown?.ecr || 0) +
+                                   (costBreakdown?.breakdown?.helm_storage || 0) +
+                                   (costBreakdown?.breakdown?.ecs_fargate || 0)) / 12;
+    
+    // Calculate total monthly cost
+    const totalMonthlyCost = networkDataLoadCost +
+                            networkCosts +
+                            containerCost +
+                            storageCost +
+                            cloudInfraCost +
+                            infraManagementCost +
+                            securityCost +
+                            monitoringCost +
+                            loadBalancerCost +
+                            containerManagementCost;
+    
+    return totalMonthlyCost;
   };
 
   const renderStorageCosts = () => {
@@ -1322,15 +1727,183 @@ function CostCalculator() {
                   </Typography>
                 </Paper>
               </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper 
+                  elevation={2} 
+                  sx={{ 
+                    p: 2, 
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'action.hover' }
+                  }}
+                  onClick={() => handleShowDetails('cloud_infra')}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="subtitle1">AWS Cloud Infrastructure</Typography>
+                    <InfoIcon color="action" fontSize="small" />
+                  </Box>
+                  <Typography variant="body2">
+                    NAT Gateway: {safeFormatCurrency((costBreakdown?.breakdown?.nat_gateway || 0) / 12)}
+                  </Typography>
+                  <Typography variant="body2">
+                    VPC Endpoints: {safeFormatCurrency((costBreakdown?.breakdown?.vpc_endpoints || 0) / 12)}
+                  </Typography>
+                  <Typography variant="h6" sx={{ mt: 1 }}>
+                    Total: {safeFormatCurrency(
+                      ((costBreakdown?.breakdown?.nat_gateway || 0) + 
+                       (costBreakdown?.breakdown?.vpc_endpoints || 0) +
+                       (costBreakdown?.breakdown?.transit_gateway || 0) +
+                       (costBreakdown?.breakdown?.route53 || 0)) / 12
+                    )}
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper 
+                  elevation={2} 
+                  sx={{ 
+                    p: 2, 
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'action.hover' }
+                  }}
+                  onClick={() => handleShowDetails('infra_management')}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="subtitle1">Infrastructure Management</Typography>
+                    <InfoIcon color="action" fontSize="small" />
+                  </Box>
+                  <Typography variant="body2">
+                    Terraform: {safeFormatCurrency((costBreakdown?.breakdown?.terraform_saas || 0) / 12)}
+                  </Typography>
+                  <Typography variant="body2">
+                    GitLab CI: {safeFormatCurrency((costBreakdown?.breakdown?.gitlab_ci || 0) / 12)}
+                  </Typography>
+                  <Typography variant="h6" sx={{ mt: 1 }}>
+                    Total: {safeFormatCurrency(
+                      ((costBreakdown?.breakdown?.terraform_saas || 0) +
+                       (costBreakdown?.breakdown?.gitlab_ci || 0) +
+                       (costBreakdown?.breakdown?.slack_seat || 0)) / 12
+                    )}
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper 
+                  elevation={2} 
+                  sx={{ 
+                    p: 2, 
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'action.hover' }
+                  }}
+                  onClick={() => handleShowDetails('security')}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="subtitle1">Security Tools</Typography>
+                    <InfoIcon color="action" fontSize="small" />
+                  </Box>
+                  <Typography variant="body2">
+                    Security Hub: {safeFormatCurrency((costBreakdown?.breakdown?.security_hub || 0) / 12)}
+                  </Typography>
+                  <Typography variant="body2">
+                    Shield Advanced: {safeFormatCurrency((costBreakdown?.breakdown?.shield_advanced || 0) / 12)}
+                  </Typography>
+                  <Typography variant="h6" sx={{ mt: 1 }}>
+                    Total: {safeFormatCurrency(
+                      ((costBreakdown?.breakdown?.security_hub || 0) +
+                       (costBreakdown?.breakdown?.waf || 0) +
+                       (costBreakdown?.breakdown?.shield_advanced || 0) +
+                       (costBreakdown?.breakdown?.guard_duty || 0)) / 12
+                    )}
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper 
+                  elevation={2} 
+                  sx={{ 
+                    p: 2, 
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'action.hover' }
+                  }}
+                  onClick={() => handleShowDetails('monitoring')}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="subtitle1">Monitoring</Typography>
+                    <InfoIcon color="action" fontSize="small" />
+                  </Box>
+                  <Typography variant="body2">
+                    CloudWatch Metrics: {formatCurrency(20)}
+                  </Typography>
+                  <Typography variant="body2">
+                    CloudWatch Management: {formatCurrency(3.333)}
+                  </Typography>
+                  <Typography variant="body2">
+                    Systems Manager: {formatCurrency(30)}
+                  </Typography>
+                  <Typography variant="body2">
+                    Managed Prometheus: {formatCurrency(50)}
+                  </Typography>
+                  <Typography variant="h6" sx={{ mt: 1 }}>
+                    Total: {formatCurrency(103.333)}
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper 
+                  elevation={2} 
+                  sx={{ 
+                    p: 2, 
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'action.hover' }
+                  }}
+                  onClick={() => handleShowDetails('load_balancer')}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="subtitle1">API & Load Balancing</Typography>
+                    <InfoIcon color="action" fontSize="small" />
+                  </Box>
+                  <Typography variant="h6">
+                    {safeFormatCurrency((costBreakdown?.breakdown?.load_balancer_base || 0) / 12)}
+                  </Typography>
+                </Paper>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Paper 
+                  elevation={2} 
+                  sx={{ 
+                    p: 2, 
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'action.hover' }
+                  }}
+                  onClick={() => handleShowDetails('container_management')}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography variant="subtitle1">Container Management</Typography>
+                    <InfoIcon color="action" fontSize="small" />
+                  </Box>
+                  <Typography variant="body2">
+                    ECR: {safeFormatCurrency((costBreakdown?.breakdown?.ecr || 0) / 12)}
+                  </Typography>
+                  <Typography variant="body2">
+                    ECS Fargate: {safeFormatCurrency((costBreakdown?.breakdown?.ecs_fargate || 0) / 12)}
+                  </Typography>
+                  <Typography variant="h6" sx={{ mt: 1 }}>
+                    Total: {safeFormatCurrency(
+                      ((costBreakdown?.breakdown?.ecr || 0) +
+                       (costBreakdown?.breakdown?.helm_storage || 0) +
+                       (costBreakdown?.breakdown?.ecs_fargate || 0)) / 12
+                    )}
+                  </Typography>
+                </Paper>
+              </Grid>
               <Grid item xs={12}>
                 <Paper elevation={3} sx={{ p: 2, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
                   <Typography variant="h6">
-                    Total Monthly Cost: {formatCurrency(getTotalCost())}
+                    Total {costPeriod.charAt(0).toUpperCase() + costPeriod.slice(1)} Cost: {formatCurrency(getTotalCost())}
                   </Typography>
                   <Typography variant="subtitle1">
                     Cost per Tenant: {formatCurrency(
                       getTotalCost() /
-                      (scaleConfigEnabled ? formData.scale.total_tenants : 1)
+                      (scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants)
                     )}
                   </Typography>
                 </Paper>

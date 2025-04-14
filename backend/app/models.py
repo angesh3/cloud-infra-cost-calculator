@@ -75,14 +75,36 @@ class CostComponents(BaseModel):
     throughput: float = 0
     messaging_mks: float = 0
     
-    # Infrastructure Cost Components
-    aws_cloud_infra: float = 3840  # Fixed yearly cost
-    infrastructure_management: float = 3336  # Fixed yearly cost
-    security_tools: float = 3228  # Fixed yearly cost
-    monitoring: float = 15360  # Variable yearly cost
-    api_load_balancing: float = 3600  # Variable yearly cost
-    caching: float = 6000  # Variable yearly cost
-    container_management: float = 1560  # Fixed yearly cost
+    # AWS Cloud Infrastructure Components
+    nat_gateway: float = 32 * 12  # $32/month
+    vpc_endpoints: float = 10 * 12  # $10/month
+    transit_gateway: float = 3 * 12  # $3/month
+    route53: float = 15 * 12  # $15/month
+    
+    # Infrastructure Management Components
+    terraform_saas: float = 12 * 12  # $12/month
+    gitlab_ci: float = 21 * 12  # $21/month
+    slack_seat: float = 2 * 12  # $2/month
+    
+    # Security Tools Components
+    security_hub: float = 40 * 12  # $40/month
+    waf: float = 25 * 12  # $25/month
+    shield_advanced: float = 300 * 12  # $300/month
+    guard_duty: float = 12 * 12  # $12/month
+    
+    # Monitoring Components
+    cloudwatch_metrics: float = 20 * 12  # $20/month for 20K metrics
+    cloudwatch_management: float = 3.33 * 12  # $3.33/month
+    systems_manager: float = 30 * 12  # $30/month
+    managed_prometheus: float = 50 * 12  # $50/month
+    
+    # API & Load Balancing Components
+    load_balancer_base: float = 100 * 12  # $100/month base cost
+    
+    # Container Management Components
+    ecr: float = 50 * 12  # $50/month
+    helm_storage: float = 10 * 12  # $10/month
+    ecs_fargate: float = 40 * 12  # $40/month
 
 class CostCalculationRequest(BaseModel):
     scale_params: ScaleParameters
