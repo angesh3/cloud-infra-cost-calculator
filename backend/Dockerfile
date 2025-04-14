@@ -12,7 +12,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the backend code with correct structure
 COPY ./app ./app
 COPY ./services ./services
-COPY ./models ./models
 COPY ./pricing_data.json .
 
 # Set Python path and environment variables
