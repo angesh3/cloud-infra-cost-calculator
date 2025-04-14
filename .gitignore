@@ -24,4 +24,53 @@ yarn-error.log*
 .idea/
 .vscode/
 *.swp
-*.swo 
+*.swo
+
+# Node modules cache
+frontend/node_modules/.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Git objects and packs
+.git/objects/pack/
+.git/index.pack
+.git/packed-refs
+
+# Logs and databases
+*.log
+*.sqlite
+*.db
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Docker
+.docker/
+*.dockerfile
+
+# Python
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local 
