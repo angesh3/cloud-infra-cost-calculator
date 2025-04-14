@@ -1698,61 +1698,39 @@ function CostCalculator() {
     // Container Cost
     const containerCost = costBreakdown?.breakdown?.container_cost || 0;
     
-    // Storage Cost
+    // Storage Cost (already monthly)
     const storageCost = storageCosts.dynamodb_final_cost + storageCosts.s3_final_cost;
     
-    // Cloud Infrastructure Costs (divided by 12 to get monthly values)
-    const cloudInfraCost = ((costBreakdown?.breakdown?.nat_gateway || 0) +
-                           (costBreakdown?.breakdown?.vpc_endpoints || 0) +
-                           (costBreakdown?.breakdown?.transit_gateway || 0) +
-                           (costBreakdown?.breakdown?.route53 || 0)) / 12;
+    // Cloud Infrastructure Costs (already monthly)
+    const cloudInfraCost = (costBreakdown?.breakdown?.nat_gateway || 0) +
+                          (costBreakdown?.breakdown?.vpc_endpoints || 0) +
+                          (costBreakdown?.breakdown?.transit_gateway || 0) +
+                          (costBreakdown?.breakdown?.route53 || 0);
     
-    // Infrastructure Management Costs
-    const infraManagementCost = ((costBreakdown?.breakdown?.terraform_saas || 0) +
-                                (costBreakdown?.breakdown?.gitlab_ci || 0) +
-                                (costBreakdown?.breakdown?.slack_seat || 0)) / 12;
+    // Infrastructure Management Costs (already monthly)
+    const infraManagementCost = (costBreakdown?.breakdown?.terraform_saas || 0) +
+                               (costBreakdown?.breakdown?.gitlab_ci || 0) +
+                               (costBreakdown?.breakdown?.slack_seat || 0);
     
-    // Security Costs
-    const securityCost = ((costBreakdown?.breakdown?.security_hub || 0) +
-                         (costBreakdown?.breakdown?.waf || 0) +
-                         (costBreakdown?.breakdown?.shield_advanced || 0) +
-                         (costBreakdown?.breakdown?.guard_duty || 0)) / 12;
+    // Security Costs (already monthly)
+    const securityCost = (costBreakdown?.breakdown?.security_hub || 0) +
+                        (costBreakdown?.breakdown?.waf || 0) +
+                        (costBreakdown?.breakdown?.shield_advanced || 0) +
+                        (costBreakdown?.breakdown?.guard_duty || 0);
     
-    // Calculate monitoring costs
-    const total_tenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
-    const endpoints_per_tenant = scaleConfigEnabled ? formData.scale.endpoints_per_tenant : minimalConfig.scale.endpoints_per_tenant;
-    const total_endpoints = total_tenants * endpoints_per_tenant;
+    // Monitoring Costs (already monthly)
+    const monitoringCost = (costBreakdown?.breakdown?.cloudwatch_metrics || 0) +
+                          (costBreakdown?.breakdown?.cloudwatch_management || 0) +
+                          (costBreakdown?.breakdown?.systems_manager || 0) +
+                          (costBreakdown?.breakdown?.managed_prometheus || 0);
     
-    // Base monitoring costs (annual)
-    const base_cloudwatch_metrics = 240; // $20 per month * 12
-    const base_cloudwatch_management = 40; // $3.33 per month * 12
-    const base_systems_manager = 360; // $30 per month * 12
-    const base_prometheus = 600; // $50 per month * 12
-
-    // Use minimal costs when configurations are disabled
-    const cloudwatch_metrics = scaleConfigEnabled ? (costBreakdown?.breakdown?.cloudwatch_metrics || base_cloudwatch_metrics) : base_cloudwatch_metrics;
-    const cloudwatch_management = scaleConfigEnabled ? (costBreakdown?.breakdown?.cloudwatch_management || base_cloudwatch_management) : base_cloudwatch_management;
-    const systems_manager = scaleConfigEnabled ? (costBreakdown?.breakdown?.systems_manager || base_systems_manager) : base_systems_manager;
-    const prometheus = scaleConfigEnabled ? (costBreakdown?.breakdown?.managed_prometheus || base_prometheus) : base_prometheus;
+    // Load Balancer Cost (already monthly)
+    const loadBalancerCost = costBreakdown?.breakdown?.load_balancer_base || 0;
     
-    // Calculate multipliers
-    const metrics_cost_multiplier = scaleConfigEnabled ? Math.max(1, Math.ceil(total_endpoints * 5 / 20000)) : 1;
-    const tenant_multiplier = scaleConfigEnabled ? Math.max(1, Math.ceil(total_tenants / 100)) : 1;
-    const endpoint_multiplier = scaleConfigEnabled ? Math.max(1, Math.ceil(total_endpoints / 1000)) : 1;
-    
-    // Calculate final monitoring costs (monthly)
-    const monitoringCost = ((cloudwatch_metrics * metrics_cost_multiplier) +
-                           cloudwatch_management +
-                           (systems_manager * tenant_multiplier) +
-                           (prometheus * endpoint_multiplier)) / 12;
-    
-    // Load Balancer Cost
-    const loadBalancerCost = (costBreakdown?.breakdown?.load_balancer_base || 0) / 12;
-    
-    // Container Management Cost
-    const containerManagementCost = ((costBreakdown?.breakdown?.ecr || 0) +
-                                   (costBreakdown?.breakdown?.helm_storage || 0) +
-                                   (costBreakdown?.breakdown?.ecs_fargate || 0)) / 12;
+    // Container Management Cost (already monthly)
+    const containerManagementCost = (costBreakdown?.breakdown?.ecr || 0) +
+                                  (costBreakdown?.breakdown?.helm_storage || 0) +
+                                  (costBreakdown?.breakdown?.ecs_fargate || 0);
     
     // Calculate total monthly cost
     const totalMonthlyCost = networkDataLoadCost +
@@ -2415,21 +2393,21 @@ function CostCalculator() {
                     <InfoIcon color="action" fontSize="small" />
                   </Box>
                   <Typography variant="body2">
-                    API Gateway: {formatCurrency(
-                      (networkLoadEnabled ? 
-                        (networkLoadConfig.api.calls_per_day * formData.scale.total_tenants * formData.scale.consumers_per_tenant * 30 / 1_000_000 * 100) :
-                        (minimalConfig.network_load.api.calls_per_day * minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant * 30 / 1_000_000 * 100))
-                    )}
+                    Base Cost: {formatCurrency(200.567)}
                   </Typography>
                   <Typography variant="body2">
-                    ALB Base: {formatCurrency(200)}
+                    Region Multiplier: {formData.region === 'us-east-1' ? '1.0x' :
+                                      formData.region === 'us-west-2' ? '1.05x' :
+                                      formData.region === 'eu-west-1' ? '1.12x' :
+                                      formData.region === 'ap-southeast-1' ? '1.15x' : '1.0x'}
                   </Typography>
                   <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency(
-                      (networkLoadEnabled ? 
-                        (networkLoadConfig.api.calls_per_day * formData.scale.total_tenants * formData.scale.consumers_per_tenant * 30 / 1_000_000 * 100) :
-                        (minimalConfig.network_load.api.calls_per_day * minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant * 30 / 1_000_000 * 100)) + 200
-                    )}
+                    Total: {formatCurrency(200.567 * (
+                      formData.region === 'us-east-1' ? 1.0 :
+                      formData.region === 'us-west-2' ? 1.05 :
+                      formData.region === 'eu-west-1' ? 1.12 :
+                      formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+                    ))}
                   </Typography>
                 </Paper>
               </Grid>
