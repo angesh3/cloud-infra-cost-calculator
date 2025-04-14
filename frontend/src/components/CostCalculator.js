@@ -30,12 +30,180 @@ import {
   Card,
   CardContent,
   Tabs,
-  Tab
+  Tab,
+  LinearProgress
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import InfoIcon from '@mui/icons-material/Info';
 import axios from 'axios';
 import CostReport from './CostReport';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
+
+// Cost Trend Compass Component
+const CostTrendCompass = ({ cloudProvider, region }) => {
+  const staticData = [
+    { quarter: 'Q1', tenants: 1, costPerTenant: 153953.12, totalCost: 153953.12 },
+    { quarter: 'Q2', tenants: 2, costPerTenant: 152638.98, totalCost: 457916.94 },
+    { quarter: 'Q3', tenants: 5, costPerTenant: 159536.26, totalCost: 797681.31 },
+    { quarter: 'Q4', tenants: 10, costPerTenant: 179932.53, totalCost: 1799325.29 },
+    { quarter: 'Q5', tenants: 50, costPerTenant: 353223.58, totalCost: 17661179.10 },
+    { quarter: 'Q6', tenants: 100, costPerTenant: 571192.65, totalCost: 57119265.33 },
+    { quarter: 'Q7', tenants: 500, costPerTenant: 2316034.84, totalCost: 1158017418.34 },
+    { quarter: 'Q8', tenants: 1000, costPerTenant: 4497218.13, totalCost: 4497218133.60 }
+  ];
+
+  return (
+    <Box sx={{ mt: 4 }}>
+      <Typography variant="h5" gutterBottom>
+        Cost Trend Analysis (8 Quarters)
+      </Typography>
+
+      {/* Cost Trend Chart */}
+      <Paper sx={{ p: 3, mb: 4 }}>
+        <Typography variant="h6" gutterBottom>
+          Cost Trend Visualization
+        </Typography>
+        <Box sx={{ width: '100%', height: 500 }}>
+          <ResponsiveContainer>
+            <LineChart
+              data={staticData}
+              margin={{
+                top: 20,
+                right: 100,
+                left: 100,
+                bottom: 20,
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="quarter" 
+                label={{ 
+                  value: 'Quarter', 
+                  position: 'bottom', 
+                  offset: -10 
+                }}
+              />
+              <YAxis 
+                yAxisId="costPerTenant"
+                orientation="left"
+                label={{ 
+                  value: 'Cost per Tenant ($)', 
+                  angle: -90, 
+                  position: 'insideLeft',
+                  offset: -80
+                }}
+                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}K`}
+                domain={[0, 'auto']}
+              />
+              <YAxis 
+                yAxisId="totalCost"
+                orientation="right"
+                label={{ 
+                  value: 'Total Monthly Cost ($)', 
+                  angle: 90, 
+                  position: 'insideRight',
+                  offset: -80
+                }}
+                tickFormatter={(value) => `$${(value / 1000000).toFixed(0)}M`}
+                domain={[0, 'auto']}
+              />
+              <RechartsTooltip 
+                formatter={(value, name) => [
+                  `$${value.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}`,
+                  name
+                ]}
+                labelFormatter={(label) => `Quarter: ${label}`}
+                contentStyle={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                  border: '1px solid #ccc',
+                  padding: '10px'
+                }}
+              />
+              <Legend 
+                verticalAlign="top" 
+                height={36}
+                wrapperStyle={{
+                  paddingTop: '10px'
+                }}
+              />
+              <Line
+                yAxisId="totalCost"
+                type="monotone"
+                dataKey="totalCost"
+                name="Total Monthly Cost"
+                stroke="#8884d8"
+                strokeWidth={2}
+                dot={{ r: 6, strokeWidth: 2 }}
+                activeDot={{ r: 8 }}
+              />
+              <Line
+                yAxisId="costPerTenant"
+                type="monotone"
+                dataKey="costPerTenant"
+                name="Cost per Tenant"
+                stroke="#82ca9d"
+                strokeWidth={2}
+                dot={{ r: 6, strokeWidth: 2 }}
+                activeDot={{ r: 8 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </Box>
+      </Paper>
+
+      {/* Cost Trend Table */}
+      <Paper sx={{ p: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Detailed Cost Breakdown
+        </Typography>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Quarter (Tenants)</TableCell>
+                <TableCell align="right">Cost per Tenant</TableCell>
+                <TableCell align="right">Monthly Cost</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {staticData.map((row) => (
+                <TableRow key={row.quarter}>
+                  <TableCell>
+                    {`${row.quarter} (${row.tenants.toLocaleString()})`}
+                  </TableCell>
+                  <TableCell align="right">
+                    ${row.costPerTenant.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </TableCell>
+                  <TableCell align="right">
+                    ${row.totalCost.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Paper>
+    </Box>
+  );
+};
 
 function CostCalculator() {
   const defaultScaleConfig = {
@@ -1965,6 +2133,7 @@ function CostCalculator() {
           <Tabs value={activeTab} onChange={handleTabChange}>
             <Tab label="Calculator" />
             <Tab label="Report" />
+            <Tab label="Cost Trend Compass" />
           </Tabs>
         </Box>
 
@@ -2754,10 +2923,10 @@ function CostCalculator() {
               </Box>
             )}
           </Box>
-        ) : (
-          <CostReport
-            formData={formData}
+        ) : activeTab === 1 ? (
+          <CostReport 
             costBreakdown={costBreakdown}
+            formData={formData}
             scaleConfigEnabled={scaleConfigEnabled}
             networkLoadEnabled={networkLoadEnabled}
             nodeConfigEnabled={nodeConfigEnabled}
@@ -2766,6 +2935,11 @@ function CostCalculator() {
             networkLoadConfig={networkLoadConfig}
             storageCosts={storageCosts}
             costPeriod={costPeriod}
+          />
+        ) : (
+          <CostTrendCompass 
+            cloudProvider={formData.cloud_provider}
+            region={formData.region}
           />
         )}
 
@@ -2778,6 +2952,8 @@ function CostCalculator() {
             {notification.message}
           </Alert>
         </Snackbar>
+
+        <CostDetailModal />
       </Paper>
     </Container>
   );
