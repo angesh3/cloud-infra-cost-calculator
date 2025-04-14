@@ -28,11 +28,14 @@ import {
   Radio,
   Tooltip,
   Card,
-  CardContent
+  CardContent,
+  Tabs,
+  Tab
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import InfoIcon from '@mui/icons-material/Info';
 import axios from 'axios';
+import CostReport from './CostReport';
 
 function CostCalculator() {
   const defaultScaleConfig = {
@@ -141,6 +144,9 @@ function CostCalculator() {
     dynamodb_final_cost: 0,
     s3_final_cost: 0
   });
+
+  // Add new state for tab control
+  const [activeTab, setActiveTab] = useState(0);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -1942,795 +1948,825 @@ function CostCalculator() {
     );
   };
 
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
+
   return (
     <Container maxWidth="lg">
       <Paper elevation={3} sx={{ p: 3, mt: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          PxGrid Cloud Cost Calculator
-        </Typography>
-
-        <Box sx={{ mb: 4 }}>
-          <Stack spacing={2}>
-            <FormControlLabel
-              control={
-                <Button
-                  variant="outlined"
-                  onClick={() => setCloudConfigModalOpen(true)}
-                  startIcon={<InfoIcon />}
-                >
-                  {`${cloudProviders[formData.cloud_provider].name} - ${
-                    cloudProviders[formData.cloud_provider].regions.find(
-                      r => r.id === formData.region
-                    )?.name
-                  }`}
-                </Button>
-              }
-              label="Cloud Provider & Region"
-              labelPlacement="start"
-              sx={{ 
-                mx: 0,
-                justifyContent: 'space-between',
-                width: '100%'
-              }}
-            />
-
-            <FormControl component="fieldset">
-              <Typography variant="subtitle1" gutterBottom>
-                Cost Period
-              </Typography>
-              <RadioGroup
-                row
-                value={costPeriod}
-                onChange={(e) => setCostPeriod(e.target.value)}
-              >
-                <FormControlLabel 
-                  value="daily" 
-                  control={<Radio />} 
-                  label="Daily" 
-                />
-                <FormControlLabel 
-                  value="monthly" 
-                  control={<Radio />} 
-                  label="Monthly" 
-                />
-                <FormControlLabel 
-                  value="yearly" 
-                  control={<Radio />} 
-                  label="Yearly" 
-                />
-              </RadioGroup>
-            </FormControl>
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={scaleConfigEnabled}
-                  onChange={handleScaleConfigChange}
-                  color="primary"
-                />
-              }
-              label={
-                <Box>
-                  <Typography variant="body1">Configure Scale Parameters</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {scaleConfigEnabled ? 'Using custom configuration' : 'Using minimal values (1)'}
-                  </Typography>
-                </Box>
-              }
-            />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={networkLoadEnabled}
-                  onChange={handleNetworkLoadChange}
-                  color="primary"
-                />
-              }
-              label={
-                <Box>
-                  <Typography variant="body1">Configure Network Load</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {networkLoadEnabled ? 'Using custom configuration' : 'Using minimal values (1)'}
-                  </Typography>
-                </Box>
-              }
-            />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={nodeConfigEnabled}
-                  onChange={handleNodeConfigChange}
-                  color="primary"
-                />
-              }
-              label={
-                <Box>
-                  <Typography variant="body1">Configure Node Parameters</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {nodeConfigEnabled ? 'Using custom configuration' : 'Using default values (2 nodes per region)'}
-                  </Typography>
-                </Box>
-              }
-            />
-          </Stack>
-
-          <Modal
-            open={scaleConfigModalOpen}
-            onClose={() => setScaleConfigModalOpen(false)}
-          >
-            <Box sx={modalStyle}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">Scale Parameters Configuration</Typography>
-                <IconButton onClick={() => setScaleConfigModalOpen(false)} size="small">
-                  <CloseIcon />
-                </IconButton>
-              </Box>
-
-              <TableContainer component={Paper} sx={{ mb: 3 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>S.No</TableCell>
-                      <TableCell>Scale Parameters</TableCell>
-                      <TableCell>Count</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell>1</TableCell>
-                      <TableCell>Cloud consumer per Tenant</TableCell>
-                      <TableCell>
-                        <TextField
-                          type="number"
-                          value={formData.scale.consumers_per_tenant}
-                          onChange={(e) => handleInputChange('consumers_per_tenant', e.target.value)}
-                          size="small"
-                          inputProps={{ min: 1 }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>2</TableCell>
-                      <TableCell>Total Tenant</TableCell>
-                      <TableCell>
-                        <TextField
-                          type="number"
-                          value={formData.scale.total_tenants}
-                          onChange={(e) => handleInputChange('total_tenants', e.target.value)}
-                          size="small"
-                          inputProps={{ min: 1 }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>3</TableCell>
-                      <TableCell>Total End-points per Tenant</TableCell>
-                      <TableCell>
-                        <TextField
-                          type="number"
-                          value={formData.scale.endpoints_per_tenant}
-                          onChange={(e) => handleInputChange('endpoints_per_tenant', e.target.value)}
-                          size="small"
-                          inputProps={{ min: 1 }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button
-                  variant="contained"
-                  onClick={() => setScaleConfigModalOpen(false)}
-                >
-                  Save Configuration
-                </Button>
-              </Box>
-            </Box>
-          </Modal>
-
-          <Modal
-            open={nodeConfigModalOpen}
-            onClose={() => setNodeConfigModalOpen(false)}
-          >
-            <Box sx={modalStyle}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">Node Parameters Configuration</Typography>
-                <IconButton onClick={() => setNodeConfigModalOpen(false)} size="small">
-                  <CloseIcon />
-                </IconButton>
-              </Box>
-
-              <TableContainer component={Paper} sx={{ mb: 3 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>S.No</TableCell>
-                      <TableCell>Node Parameters</TableCell>
-                      <TableCell>Count</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell>1</TableCell>
-                      <TableCell>ElastiCache Nodes per Region</TableCell>
-                      <TableCell>
-                        <TextField
-                          type="number"
-                          value={formData.nodes.elasticache_nodes_per_region}
-                          onChange={(e) => handleNodeInputChange('elasticache_nodes_per_region', e.target.value)}
-                          size="small"
-                          inputProps={{ min: 1 }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell>2</TableCell>
-                      <TableCell>DynamoDB Nodes</TableCell>
-                      <TableCell>
-                        <TextField
-                          type="number"
-                          value={formData.nodes.dynamodb_nodes}
-                          onChange={(e) => handleNodeInputChange('dynamodb_nodes', e.target.value)}
-                          size="small"
-                          inputProps={{ min: 1 }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button
-                  variant="contained"
-                  onClick={() => setNodeConfigModalOpen(false)}
-                >
-                  Save Configuration
-                </Button>
-              </Box>
-            </Box>
-          </Modal>
-
-          <Modal
-            open={networkLoadModalOpen}
-            onClose={() => setNetworkLoadModalOpen(false)}
-          >
-            <Box sx={modalStyle}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">Network Load Configuration</Typography>
-                <IconButton onClick={() => setNetworkLoadModalOpen(false)} size="small">
-                  <CloseIcon />
-                </IconButton>
-              </Box>
-
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <Typography variant="subtitle1" gutterBottom>API Configuration</Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="Average API Calls per Day"
-                        type="number"
-                        value={networkLoadConfig.api.calls_per_day}
-                        onChange={(e) => handleNetworkConfigChange('api', 'calls_per_day', e.target.value)}
-                        size="small"
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="Average Request Size (MB)"
-                        type="number"
-                        value={networkLoadConfig.api.request_size_mb}
-                        onChange={(e) => handleNetworkConfigChange('api', 'request_size_mb', e.target.value)}
-                        size="small"
-                      />
-                    </Grid>
-                  </Grid>
-                </Grid>
-
-                <Grid item xs={12}>
-                  <Typography variant="subtitle1" gutterBottom>Message Events Configuration</Typography>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="Average Events per Day"
-                        type="number"
-                        value={networkLoadConfig.messages.events_per_day}
-                        onChange={(e) => handleNetworkConfigChange('messages', 'events_per_day', e.target.value)}
-                        size="small"
-                      />
-                    </Grid>
-                    <Grid item xs={12} md={6}>
-                      <TextField
-                        fullWidth
-                        label="Average Message Size (KB)"
-                        type="number"
-                        value={networkLoadConfig.messages.message_size_kb}
-                        onChange={(e) => handleNetworkConfigChange('messages', 'message_size_kb', e.target.value)}
-                        size="small"
-                      />
-                    </Grid>
-                  </Grid>
-                </Grid>
-              </Grid>
-
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button
-                  variant="contained"
-                  onClick={() => setNetworkLoadModalOpen(false)}
-                >
-                  Save Configuration
-                </Button>
-              </Box>
-            </Box>
-          </Modal>
-
-          <Modal
-            open={cloudConfigModalOpen}
-            onClose={() => setCloudConfigModalOpen(false)}
-          >
-            <Box sx={modalStyle}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">Cloud Provider & Region Configuration</Typography>
-                <IconButton onClick={() => setCloudConfigModalOpen(false)} size="small">
-                  <CloseIcon />
-                </IconButton>
-              </Box>
-
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <FormControl fullWidth>
-                    <InputLabel>Cloud Provider</InputLabel>
-                    <Select
-                      value={formData.cloud_provider}
-                      onChange={handleProviderChange}
-                      label="Cloud Provider"
-                    >
-                      {Object.entries(cloudProviders).map(([key, provider]) => (
-                        <MenuItem key={key} value={key}>
-                          {provider.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={12}>
-                  <FormControl fullWidth>
-                    <InputLabel>Region</InputLabel>
-                    <Select
-                      value={formData.region}
-                      onChange={handleRegionChange}
-                      label="Region"
-                    >
-                      {cloudProviders[formData.cloud_provider].regions.map((region) => (
-                        <MenuItem key={region.id} value={region.id}>
-                          {region.name} ({region.id}) - {region.id === 'us-east-1' ? '1.0x' :
-                            region.id === 'us-west-2' ? '1.05x' :
-                            region.id === 'eu-west-1' ? '1.12x' :
-                            region.id === 'ap-southeast-1' ? '1.15x' : '1.0x'} base price
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={12}>
-                  <Typography variant="body2" color="text.secondary">
-                    Current Region: {cloudProviders[formData.cloud_provider].regions.find(r => r.id === formData.region)?.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Price Multiplier: {formData.region === 'us-east-1' ? '1.0x' :
-                      formData.region === 'us-west-2' ? '1.05x' :
-                      formData.region === 'eu-west-1' ? '1.12x' :
-                      formData.region === 'ap-southeast-1' ? '1.15x' : '1.0x'} base price
-                  </Typography>
-                </Grid>
-              </Grid>
-
-              <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-                <Button
-                  variant="outlined"
-                  onClick={() => setCloudConfigModalOpen(false)}
-                >
-                  Close
-                </Button>
-              </Box>
-            </Box>
-          </Modal>
-
-          <Box sx={{ mt: 3 }}>
-            <Button
-              variant="contained"
-              color="primary"
-              size="large"
-              onClick={calculateCosts}
-            >
-              Calculate Costs
-            </Button>
-          </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h4" gutterBottom>
+            CloudConnect Expense Estimator
+          </Typography>
         </Box>
 
-        {costBreakdown && (
-          <Box sx={{ mt: 4 }}>
-            <Typography variant="h5" gutterBottom>Cost Breakdown ({costPeriod.charAt(0).toUpperCase() + costPeriod.slice(1)})</Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  onClick={() => handleShowDetails('pxgrid', costBreakdown?.breakdown?.pxgrid_cost)}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1">Network Data Load Costs</Typography>
-                    <InfoIcon color="action" fontSize="small" />
-                  </Box>
-                  <Typography variant="body2">
-                    Message Publishing: {formatCurrency(
-                      ((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : minimalConfig.network_load.messages.events_per_day) * 
-                      (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
-                      minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) / 1000000 * 9.25 * 30) * 
-                      (formData.region === 'us-east-1' ? 1.0 :
-                       formData.region === 'us-west-2' ? 1.05 :
-                       formData.region === 'eu-west-1' ? 1.12 :
-                       formData.region === 'ap-southeast-1' ? 1.15 : 1.0)
-                    )}
-                  </Typography>
-                  <Typography variant="body2">
-                    API Cost: {formatCurrency(
-                      ((networkLoadEnabled ? networkLoadConfig.api.calls_per_day : minimalConfig.network_load.api.calls_per_day) * 
-                      (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
-                      minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) * 0.00189 * 30) * 
-                      (formData.region === 'us-east-1' ? 1.0 :
-                       formData.region === 'us-west-2' ? 1.05 :
-                       formData.region === 'eu-west-1' ? 1.12 :
-                       formData.region === 'ap-southeast-1' ? 1.15 : 1.0)
-                    )}
-                  </Typography>
-                  <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency(
-                      // Message Publishing Cost
-                      ((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : minimalConfig.network_load.messages.events_per_day) * 
-                      (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
-                      minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) / 1000000 * 9.25 * 30 +
-                      // API Cost
-                      (networkLoadEnabled ? networkLoadConfig.api.calls_per_day : minimalConfig.network_load.api.calls_per_day) * 
-                      (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
-                      minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) * 0.00189 * 30) *
-                      // Region Multiplier
-                      (formData.region === 'us-east-1' ? 1.0 :
-                       formData.region === 'us-west-2' ? 1.05 :
-                       formData.region === 'eu-west-1' ? 1.12 :
-                       formData.region === 'ap-southeast-1' ? 1.15 : 1.0)
-                    )}
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                {renderStorageCosts()}
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  onClick={() => handleShowDetails('container', costBreakdown?.breakdown?.container_cost)}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1">Container Costs</Typography>
-                    <InfoIcon color="action" fontSize="small" />
-                  </Box>
-                  <Typography variant="body2">
-                    EKS Base: {formatCurrency(73)}
-                  </Typography>
-                  <Typography variant="body2">
-                    Compute: {formatCurrency(71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100) + 
-                      Math.floor((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1) / 1_000_000)))}
-                  </Typography>
-                  <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency(
-                      (73 + (71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100) + 
-                      Math.floor((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1) / 1_000_000)))) * (
-                        formData.region === 'us-east-1' ? 1.0 :
-                        formData.region === 'us-west-2' ? 1.05 :
-                        formData.region === 'eu-west-1' ? 1.12 :
-                        formData.region === 'ap-southeast-1' ? 1.15 : 1.0
-                      )
-                    )}
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  onClick={() => handleShowDetails('network', costBreakdown?.breakdown?.network)}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1">Network Costs</Typography>
-                    <InfoIcon color="action" fontSize="small" />
-                  </Box>
-                  <Typography variant="body2">
-                    Throughput: {formatCurrency(costBreakdown?.breakdown?.network?.throughput_cost)}
-                  </Typography>
-                  <Typography variant="body2">
-                    MSK: {formatCurrency(costBreakdown?.breakdown?.network?.msk_cost)}
-                  </Typography>
-                  <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: "{formatCurrency(
-                      (costBreakdown?.breakdown?.network?.throughput_cost || 0) + 
-                      (costBreakdown?.breakdown?.network?.msk_cost || 0)
-                    )}"
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  onClick={() => handleShowDetails('cloud_infrastructure')}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1">AWS Cloud Infrastructure</Typography>
-                    <InfoIcon color="action" fontSize="small" />
-                  </Box>
-                  <Typography variant="body2">
-                    NAT Gateway: {formatCurrency(32)}
-                  </Typography>
-                  <Typography variant="body2">
-                    VPC Endpoints: {formatCurrency(100)}
-                  </Typography>
-                  <Typography variant="body2">
-                    Transit Gateway: {formatCurrency(73)}
-                  </Typography>
-                  <Typography variant="body2">
-                    Route 53: {formatCurrency(15)}
-                  </Typography>
-                  <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency(
-                      (32 + 100 + 73 + 15) * (
-                        formData.region === 'us-east-1' ? 1.0 :
-                        formData.region === 'us-west-2' ? 1.05 :
-                        formData.region === 'eu-west-1' ? 1.12 :
-                        formData.region === 'ap-southeast-1' ? 1.15 : 1.0
-                      )
-                    )}
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  onClick={() => handleShowDetails('infra_management')}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1">Infrastructure Management</Typography>
-                    <InfoIcon color="action" fontSize="small" />
-                  </Box>
-                  <Typography variant="body2">
-                    Terraform State (S3): {formatCurrency(costBreakdown?.breakdown?.terraform_s3 || 3)}
-                  </Typography>
-                  <Typography variant="body2">
-                    Terraform State (DynamoDB): {formatCurrency(costBreakdown?.breakdown?.terraform_dynamodb || 2)}
-                  </Typography>
-                  <Typography variant="body2">
-                    CI/CD Pipeline: {formatCurrency(costBreakdown?.breakdown?.cicd_pipeline || 51)}
-                  </Typography>
-                  <Typography variant="body2">
-                    Multi-Region: {formatCurrency(costBreakdown?.breakdown?.multi_region_deployment || 222)}
-                  </Typography>
-                  <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency(
-                      (costBreakdown?.breakdown?.terraform_s3 || 3) +
-                      (costBreakdown?.breakdown?.terraform_dynamodb || 2) +
-                      (costBreakdown?.breakdown?.cicd_pipeline || 51) +
-                      (costBreakdown?.breakdown?.multi_region_deployment || 222)
-                    )}
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  onClick={() => handleShowDetails('security')}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1">Security Tools</Typography>
-                    <InfoIcon color="action" fontSize="small" />
-                  </Box>
-                  <Typography variant="body2">
-                    Security Hub: {formatCurrency(80)}
-                  </Typography>
-                  <Typography variant="body2">
-                    WAF & Shield: {formatCurrency(3006)}
-                  </Typography>
-                  <Typography variant="body2">
-                    GuardDuty & IAM: {formatCurrency(110)}
-                  </Typography>
-                  <Typography variant="body2">
-                    Secrets & Certs: {formatCurrency(73)}
-                  </Typography>
-                  <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency(3269)}
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  onClick={() => handleShowDetails('monitoring')}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1">Monitoring</Typography>
-                    <InfoIcon color="action" fontSize="small" />
-                  </Box>
-                  <Typography variant="body2">
-                    CloudWatch Metrics: {formatCurrency(20)}
-                  </Typography>
-                  <Typography variant="body2">
-                    CloudWatch Management: {formatCurrency(3.333)}
-                  </Typography>
-                  <Typography variant="body2">
-                    Systems Manager: {formatCurrency(30)}
-                  </Typography>
-                  <Typography variant="body2">
-                    Managed Prometheus: {formatCurrency(50)}
-                  </Typography>
-                  <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency(103.333)}
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  onClick={() => handleShowDetails('load_balancer')}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1">API & Load Balancing</Typography>
-                    <InfoIcon color="action" fontSize="small" />
-                  </Box>
-                  <Typography variant="body2">
-                    Base Cost: {formatCurrency(200.567)}
-                  </Typography>
-                  <Typography variant="body2">
-                    Region Multiplier: {formData.region === 'us-east-1' ? '1.0x' :
-                                      formData.region === 'us-west-2' ? '1.05x' :
-                                      formData.region === 'eu-west-1' ? '1.12x' :
-                                      formData.region === 'ap-southeast-1' ? '1.15x' : '1.0x'}
-                  </Typography>
-                  <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency(200.567 * (
-                      formData.region === 'us-east-1' ? 1.0 :
-                      formData.region === 'us-west-2' ? 1.05 :
-                      formData.region === 'eu-west-1' ? 1.12 :
-                      formData.region === 'ap-southeast-1' ? 1.15 : 1.0
-                    ))}
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  onClick={() => handleShowDetails('container_management')}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1">Container Management</Typography>
-                    <InfoIcon color="action" fontSize="small" />
-                  </Box>
-                  <Typography variant="body2">
-                    ECR & Helm: {formatCurrency(60)} {/* $50 ECR + $10 Helm */}
-                  </Typography>
-                  <Typography variant="body2">
-                    ECS Fargate: {formatCurrency(40)}
-                  </Typography>
-                  <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency(100 * (
-                      formData.region === 'us-east-1' ? 1.0 :
-                      formData.region === 'us-west-2' ? 1.05 :
-                      formData.region === 'eu-west-1' ? 1.12 :
-                      formData.region === 'ap-southeast-1' ? 1.15 : 1.0
-                    ))}
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Paper 
-                  elevation={2} 
-                  sx={{ 
-                    p: 2, 
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  onClick={() => handleShowDetails('caching')}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle1">Caching</Typography>
-                    <InfoIcon color="action" fontSize="small" />
-                  </Box>
-                  <Typography variant="body2">
-                    ElastiCache: {formatCurrency(300 * (nodeConfigEnabled ? formData.nodes.elasticache_nodes_per_region : defaultNodeConfig.elasticache_nodes_per_region))}
-                  </Typography>
-                  <Typography variant="body2">
-                    DynamoDB Accelerator (DAX): {formatCurrency(200 * (nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes))}
-                  </Typography>
-                  <Typography variant="h6" sx={{ mt: 1 }}>
-                    Total: {formatCurrency((
-                      (300 * (nodeConfigEnabled ? formData.nodes.elasticache_nodes_per_region : defaultNodeConfig.elasticache_nodes_per_region)) + 
-                      (200 * (nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes))
-                    ) * (
-                      formData.region === 'us-east-1' ? 1.0 :
-                      formData.region === 'us-west-2' ? 1.05 :
-                      formData.region === 'eu-west-1' ? 1.12 :
-                      formData.region === 'ap-southeast-1' ? 1.15 : 1.0
-                    ))}
-                  </Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: 2, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-                  <Typography variant="h6">
-                    Total {costPeriod.charAt(0).toUpperCase() + costPeriod.slice(1)} Cost: {formatCurrency(getTotalCost())}
-                  </Typography>
-                  <Typography variant="subtitle1">
-                    Cost per Tenant: {formatCurrency(
-                      getTotalCost() /
-                      (scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants)
-                    )}
-                  </Typography>
-                </Paper>
-              </Grid>
-            </Grid>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs value={activeTab} onChange={handleTabChange}>
+            <Tab label="Calculator" />
+            <Tab label="Report" />
+          </Tabs>
+        </Box>
 
-            <CostDetailModal />
+        {activeTab === 0 ? (
+          <Box>
+            <Box sx={{ mb: 4 }}>
+              <Stack spacing={2}>
+                <FormControlLabel
+                  control={
+                    <Button
+                      variant="outlined"
+                      onClick={() => setCloudConfigModalOpen(true)}
+                      startIcon={<InfoIcon />}
+                    >
+                      {`${cloudProviders[formData.cloud_provider].name} - ${
+                        cloudProviders[formData.cloud_provider].regions.find(
+                          r => r.id === formData.region
+                        )?.name
+                      }`}
+                    </Button>
+                  }
+                  label="Cloud Provider & Region"
+                  labelPlacement="start"
+                  sx={{ 
+                    mx: 0,
+                    justifyContent: 'space-between',
+                    width: '100%'
+                  }}
+                />
+
+                <FormControl component="fieldset">
+                  <Typography variant="subtitle1" gutterBottom>
+                    Cost Period
+                  </Typography>
+                  <RadioGroup
+                    row
+                    value={costPeriod}
+                    onChange={(e) => setCostPeriod(e.target.value)}
+                  >
+                    <FormControlLabel 
+                      value="daily" 
+                      control={<Radio />} 
+                      label="Daily" 
+                    />
+                    <FormControlLabel 
+                      value="monthly" 
+                      control={<Radio />} 
+                      label="Monthly" 
+                    />
+                    <FormControlLabel 
+                      value="yearly" 
+                      control={<Radio />} 
+                      label="Yearly" 
+                    />
+                  </RadioGroup>
+                </FormControl>
+
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={scaleConfigEnabled}
+                      onChange={handleScaleConfigChange}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1">Configure Scale Parameters</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {scaleConfigEnabled ? 'Using custom configuration' : 'Using minimal values (1)'}
+                      </Typography>
+                    </Box>
+                  }
+                />
+
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={networkLoadEnabled}
+                      onChange={handleNetworkLoadChange}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1">Configure Network Load</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {networkLoadEnabled ? 'Using custom configuration' : 'Using minimal values (1)'}
+                      </Typography>
+                    </Box>
+                  }
+                />
+
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={nodeConfigEnabled}
+                      onChange={handleNodeConfigChange}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1">Configure Node Parameters</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {nodeConfigEnabled ? 'Using custom configuration' : 'Using default values (2 nodes per region)'}
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </Stack>
+            </Box>
+
+            <Modal
+              open={scaleConfigModalOpen}
+              onClose={() => setScaleConfigModalOpen(false)}
+            >
+              <Box sx={modalStyle}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">Scale Parameters Configuration</Typography>
+                  <IconButton onClick={() => setScaleConfigModalOpen(false)} size="small">
+                    <CloseIcon />
+                  </IconButton>
+                </Box>
+
+                <TableContainer component={Paper} sx={{ mb: 3 }}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>S.No</TableCell>
+                        <TableCell>Scale Parameters</TableCell>
+                        <TableCell>Count</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell>1</TableCell>
+                        <TableCell>Cloud consumer per Tenant</TableCell>
+                        <TableCell>
+                          <TextField
+                            type="number"
+                            value={formData.scale.consumers_per_tenant}
+                            onChange={(e) => handleInputChange('consumers_per_tenant', e.target.value)}
+                            size="small"
+                            inputProps={{ min: 1 }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>2</TableCell>
+                        <TableCell>Total Tenant</TableCell>
+                        <TableCell>
+                          <TextField
+                            type="number"
+                            value={formData.scale.total_tenants}
+                            onChange={(e) => handleInputChange('total_tenants', e.target.value)}
+                            size="small"
+                            inputProps={{ min: 1 }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>3</TableCell>
+                        <TableCell>Total End-points per Tenant</TableCell>
+                        <TableCell>
+                          <TextField
+                            type="number"
+                            value={formData.scale.endpoints_per_tenant}
+                            onChange={(e) => handleInputChange('endpoints_per_tenant', e.target.value)}
+                            size="small"
+                            inputProps={{ min: 1 }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="contained"
+                    onClick={() => setScaleConfigModalOpen(false)}
+                  >
+                    Save Configuration
+                  </Button>
+                </Box>
+              </Box>
+            </Modal>
+
+            <Modal
+              open={nodeConfigModalOpen}
+              onClose={() => setNodeConfigModalOpen(false)}
+            >
+              <Box sx={modalStyle}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">Node Parameters Configuration</Typography>
+                  <IconButton onClick={() => setNodeConfigModalOpen(false)} size="small">
+                    <CloseIcon />
+                  </IconButton>
+                </Box>
+
+                <TableContainer component={Paper} sx={{ mb: 3 }}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>S.No</TableCell>
+                        <TableCell>Node Parameters</TableCell>
+                        <TableCell>Count</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell>1</TableCell>
+                        <TableCell>ElastiCache Nodes per Region</TableCell>
+                        <TableCell>
+                          <TextField
+                            type="number"
+                            value={formData.nodes.elasticache_nodes_per_region}
+                            onChange={(e) => handleNodeInputChange('elasticache_nodes_per_region', e.target.value)}
+                            size="small"
+                            inputProps={{ min: 1 }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell>2</TableCell>
+                        <TableCell>DynamoDB Nodes</TableCell>
+                        <TableCell>
+                          <TextField
+                            type="number"
+                            value={formData.nodes.dynamodb_nodes}
+                            onChange={(e) => handleNodeInputChange('dynamodb_nodes', e.target.value)}
+                            size="small"
+                            inputProps={{ min: 1 }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="contained"
+                    onClick={() => setNodeConfigModalOpen(false)}
+                  >
+                    Save Configuration
+                  </Button>
+                </Box>
+              </Box>
+            </Modal>
+
+            <Modal
+              open={networkLoadModalOpen}
+              onClose={() => setNetworkLoadModalOpen(false)}
+            >
+              <Box sx={modalStyle}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">Network Load Configuration</Typography>
+                  <IconButton onClick={() => setNetworkLoadModalOpen(false)} size="small">
+                    <CloseIcon />
+                  </IconButton>
+                </Box>
+
+                <Grid container spacing={3}>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle1" gutterBottom>API Configuration</Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="Average API Calls per Day"
+                          type="number"
+                          value={networkLoadConfig.api.calls_per_day}
+                          onChange={(e) => handleNetworkConfigChange('api', 'calls_per_day', e.target.value)}
+                          size="small"
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="Average Request Size (MB)"
+                          type="number"
+                          value={networkLoadConfig.api.request_size_mb}
+                          onChange={(e) => handleNetworkConfigChange('api', 'request_size_mb', e.target.value)}
+                          size="small"
+                        />
+                      </Grid>
+                    </Grid>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle1" gutterBottom>Message Events Configuration</Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="Average Events per Day"
+                          type="number"
+                          value={networkLoadConfig.messages.events_per_day}
+                          onChange={(e) => handleNetworkConfigChange('messages', 'events_per_day', e.target.value)}
+                          size="small"
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="Average Message Size (KB)"
+                          type="number"
+                          value={networkLoadConfig.messages.message_size_kb}
+                          onChange={(e) => handleNetworkConfigChange('messages', 'message_size_kb', e.target.value)}
+                          size="small"
+                        />
+                      </Grid>
+                    </Grid>
+                  </Grid>
+                </Grid>
+
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="contained"
+                    onClick={() => setNetworkLoadModalOpen(false)}
+                  >
+                    Save Configuration
+                  </Button>
+                </Box>
+              </Box>
+            </Modal>
+
+            <Modal
+              open={cloudConfigModalOpen}
+              onClose={() => setCloudConfigModalOpen(false)}
+            >
+              <Box sx={modalStyle}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">Cloud Provider & Region Configuration</Typography>
+                  <IconButton onClick={() => setCloudConfigModalOpen(false)} size="small">
+                    <CloseIcon />
+                  </IconButton>
+                </Box>
+
+                <Grid container spacing={3}>
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>Cloud Provider</InputLabel>
+                      <Select
+                        value={formData.cloud_provider}
+                        onChange={handleProviderChange}
+                        label="Cloud Provider"
+                      >
+                        {Object.entries(cloudProviders).map(([key, provider]) => (
+                          <MenuItem key={key} value={key}>
+                            {provider.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <FormControl fullWidth>
+                      <InputLabel>Region</InputLabel>
+                      <Select
+                        value={formData.region}
+                        onChange={handleRegionChange}
+                        label="Region"
+                      >
+                        {cloudProviders[formData.cloud_provider].regions.map((region) => (
+                          <MenuItem key={region.id} value={region.id}>
+                            {region.name} ({region.id}) - {region.id === 'us-east-1' ? '1.0x' :
+                              region.id === 'us-west-2' ? '1.05x' :
+                              region.id === 'eu-west-1' ? '1.12x' :
+                              region.id === 'ap-southeast-1' ? '1.15x' : '1.0x'} base price
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">
+                      Current Region: {cloudProviders[formData.cloud_provider].regions.find(r => r.id === formData.region)?.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Price Multiplier: {formData.region === 'us-east-1' ? '1.0x' :
+                        formData.region === 'us-west-2' ? '1.05x' :
+                        formData.region === 'eu-west-1' ? '1.12x' :
+                        formData.region === 'ap-southeast-1' ? '1.15x' : '1.0x'} base price
+                    </Typography>
+                  </Grid>
+                </Grid>
+
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+                  <Button
+                    variant="outlined"
+                    onClick={() => setCloudConfigModalOpen(false)}
+                  >
+                    Close
+                  </Button>
+                </Box>
+              </Box>
+            </Modal>
+
+            <Box sx={{ mt: 3 }}>
+              <Button
+                variant="contained"
+                color="primary"
+                size="large"
+                onClick={calculateCosts}
+              >
+                Calculate Costs
+              </Button>
+            </Box>
+
+            {costBreakdown && (
+              <Box sx={{ mt: 4 }}>
+                <Typography variant="h5" gutterBottom>Cost Breakdown ({costPeriod.charAt(0).toUpperCase() + costPeriod.slice(1)})</Typography>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={6}>
+                    <Paper 
+                      elevation={2} 
+                      sx={{ 
+                        p: 2, 
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                      onClick={() => handleShowDetails('pxgrid', costBreakdown?.breakdown?.pxgrid_cost)}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1">Network Data Load Costs</Typography>
+                        <InfoIcon color="action" fontSize="small" />
+                      </Box>
+                      <Typography variant="body2">
+                        Message Publishing: {formatCurrency(
+                          ((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : minimalConfig.network_load.messages.events_per_day) * 
+                          (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+                          minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) / 1000000 * 9.25 * 30) * 
+                          (formData.region === 'us-east-1' ? 1.0 :
+                           formData.region === 'us-west-2' ? 1.05 :
+                           formData.region === 'eu-west-1' ? 1.12 :
+                           formData.region === 'ap-southeast-1' ? 1.15 : 1.0)
+                        )}
+                      </Typography>
+                      <Typography variant="body2">
+                        API Cost: {formatCurrency(
+                          ((networkLoadEnabled ? networkLoadConfig.api.calls_per_day : minimalConfig.network_load.api.calls_per_day) * 
+                          (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+                          minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) * 0.00189 * 30) * 
+                          (formData.region === 'us-east-1' ? 1.0 :
+                           formData.region === 'us-west-2' ? 1.05 :
+                           formData.region === 'eu-west-1' ? 1.12 :
+                           formData.region === 'ap-southeast-1' ? 1.15 : 1.0)
+                        )}
+                      </Typography>
+                      <Typography variant="h6" sx={{ mt: 1 }}>
+                        Total: {formatCurrency(
+                          // Message Publishing Cost
+                          ((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : minimalConfig.network_load.messages.events_per_day) * 
+                          (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+                          minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) / 1000000 * 9.25 * 30 +
+                          // API Cost
+                          (networkLoadEnabled ? networkLoadConfig.api.calls_per_day : minimalConfig.network_load.api.calls_per_day) * 
+                          (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+                          minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) * 0.00189 * 30) *
+                          // Region Multiplier
+                          (formData.region === 'us-east-1' ? 1.0 :
+                           formData.region === 'us-west-2' ? 1.05 :
+                           formData.region === 'eu-west-1' ? 1.12 :
+                           formData.region === 'ap-southeast-1' ? 1.15 : 1.0)
+                        )}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    {renderStorageCosts()}
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Paper 
+                      elevation={2} 
+                      sx={{ 
+                        p: 2, 
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                      onClick={() => handleShowDetails('container', costBreakdown?.breakdown?.container_cost)}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1">Container Costs</Typography>
+                        <InfoIcon color="action" fontSize="small" />
+                      </Box>
+                      <Typography variant="body2">
+                        EKS Base: {formatCurrency(73)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Compute: {formatCurrency(71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100) + 
+                          Math.floor((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1) / 1_000_000)))}
+                      </Typography>
+                      <Typography variant="h6" sx={{ mt: 1 }}>
+                        Total: {formatCurrency(
+                          (73 + (71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100) + 
+                          Math.floor((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1) / 1_000_000)))) * (
+                            formData.region === 'us-east-1' ? 1.0 :
+                            formData.region === 'us-west-2' ? 1.05 :
+                            formData.region === 'eu-west-1' ? 1.12 :
+                            formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+                          )
+                        )}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Paper 
+                      elevation={2} 
+                      sx={{ 
+                        p: 2, 
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                      onClick={() => handleShowDetails('network', costBreakdown?.breakdown?.network)}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1">Network Costs</Typography>
+                        <InfoIcon color="action" fontSize="small" />
+                      </Box>
+                      <Typography variant="body2">
+                        Throughput: {formatCurrency(costBreakdown?.breakdown?.network?.throughput_cost)}
+                      </Typography>
+                      <Typography variant="body2">
+                        MSK: {formatCurrency(costBreakdown?.breakdown?.network?.msk_cost)}
+                      </Typography>
+                      <Typography variant="h6" sx={{ mt: 1 }}>
+                        Total: "{formatCurrency(
+                          (costBreakdown?.breakdown?.network?.throughput_cost || 0) + 
+                          (costBreakdown?.breakdown?.network?.msk_cost || 0)
+                        )}"
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Paper 
+                      elevation={2} 
+                      sx={{ 
+                        p: 2, 
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                      onClick={() => handleShowDetails('cloud_infrastructure')}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1">AWS Cloud Infrastructure</Typography>
+                        <InfoIcon color="action" fontSize="small" />
+                      </Box>
+                      <Typography variant="body2">
+                        NAT Gateway: {formatCurrency(32)}
+                      </Typography>
+                      <Typography variant="body2">
+                        VPC Endpoints: {formatCurrency(100)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Transit Gateway: {formatCurrency(73)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Route 53: {formatCurrency(15)}
+                      </Typography>
+                      <Typography variant="h6" sx={{ mt: 1 }}>
+                        Total: {formatCurrency(
+                          (32 + 100 + 73 + 15) * (
+                            formData.region === 'us-east-1' ? 1.0 :
+                            formData.region === 'us-west-2' ? 1.05 :
+                            formData.region === 'eu-west-1' ? 1.12 :
+                            formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+                          )
+                        )}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Paper 
+                      elevation={2} 
+                      sx={{ 
+                        p: 2, 
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                      onClick={() => handleShowDetails('infra_management')}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1">Infrastructure Management</Typography>
+                        <InfoIcon color="action" fontSize="small" />
+                      </Box>
+                      <Typography variant="body2">
+                        Terraform State (S3): {formatCurrency(costBreakdown?.breakdown?.terraform_s3 || 3)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Terraform State (DynamoDB): {formatCurrency(costBreakdown?.breakdown?.terraform_dynamodb || 2)}
+                      </Typography>
+                      <Typography variant="body2">
+                        CI/CD Pipeline: {formatCurrency(costBreakdown?.breakdown?.cicd_pipeline || 51)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Multi-Region: {formatCurrency(costBreakdown?.breakdown?.multi_region_deployment || 222)}
+                      </Typography>
+                      <Typography variant="h6" sx={{ mt: 1 }}>
+                        Total: {formatCurrency(
+                          (costBreakdown?.breakdown?.terraform_s3 || 3) +
+                          (costBreakdown?.breakdown?.terraform_dynamodb || 2) +
+                          (costBreakdown?.breakdown?.cicd_pipeline || 51) +
+                          (costBreakdown?.breakdown?.multi_region_deployment || 222)
+                        )}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Paper 
+                      elevation={2} 
+                      sx={{ 
+                        p: 2, 
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                      onClick={() => handleShowDetails('security')}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1">Security Tools</Typography>
+                        <InfoIcon color="action" fontSize="small" />
+                      </Box>
+                      <Typography variant="body2">
+                        Security Hub: {formatCurrency(80)}
+                      </Typography>
+                      <Typography variant="body2">
+                        WAF & Shield: {formatCurrency(3006)}
+                      </Typography>
+                      <Typography variant="body2">
+                        GuardDuty & IAM: {formatCurrency(110)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Secrets & Certs: {formatCurrency(73)}
+                      </Typography>
+                      <Typography variant="h6" sx={{ mt: 1 }}>
+                        Total: {formatCurrency(3269)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Paper 
+                      elevation={2} 
+                      sx={{ 
+                        p: 2, 
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                      onClick={() => handleShowDetails('monitoring')}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1">Monitoring</Typography>
+                        <InfoIcon color="action" fontSize="small" />
+                      </Box>
+                      <Typography variant="body2">
+                        CloudWatch Metrics: {formatCurrency(20)}
+                      </Typography>
+                      <Typography variant="body2">
+                        CloudWatch Management: {formatCurrency(3.333)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Systems Manager: {formatCurrency(30)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Managed Prometheus: {formatCurrency(50)}
+                      </Typography>
+                      <Typography variant="h6" sx={{ mt: 1 }}>
+                        Total: {formatCurrency(103.333)}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Paper 
+                      elevation={2} 
+                      sx={{ 
+                        p: 2, 
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                      onClick={() => handleShowDetails('load_balancer')}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1">API & Load Balancing</Typography>
+                        <InfoIcon color="action" fontSize="small" />
+                      </Box>
+                      <Typography variant="body2">
+                        Base Cost: {formatCurrency(200.567)}
+                      </Typography>
+                      <Typography variant="body2">
+                        Region Multiplier: {formData.region === 'us-east-1' ? '1.0x' :
+                                          formData.region === 'us-west-2' ? '1.05x' :
+                                          formData.region === 'eu-west-1' ? '1.12x' :
+                                          formData.region === 'ap-southeast-1' ? '1.15x' : '1.0x'}
+                      </Typography>
+                      <Typography variant="h6" sx={{ mt: 1 }}>
+                        Total: {formatCurrency(200.567 * (
+                          formData.region === 'us-east-1' ? 1.0 :
+                          formData.region === 'us-west-2' ? 1.05 :
+                          formData.region === 'eu-west-1' ? 1.12 :
+                          formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+                        ))}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Paper 
+                      elevation={2} 
+                      sx={{ 
+                        p: 2, 
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                      onClick={() => handleShowDetails('container_management')}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1">Container Management</Typography>
+                        <InfoIcon color="action" fontSize="small" />
+                      </Box>
+                      <Typography variant="body2">
+                        ECR & Helm: {formatCurrency(60)} {/* $50 ECR + $10 Helm */}
+                      </Typography>
+                      <Typography variant="body2">
+                        ECS Fargate: {formatCurrency(40)}
+                      </Typography>
+                      <Typography variant="h6" sx={{ mt: 1 }}>
+                        Total: {formatCurrency(100 * (
+                          formData.region === 'us-east-1' ? 1.0 :
+                          formData.region === 'us-west-2' ? 1.05 :
+                          formData.region === 'eu-west-1' ? 1.12 :
+                          formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+                        ))}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Paper 
+                      elevation={2} 
+                      sx={{ 
+                        p: 2, 
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                      onClick={() => handleShowDetails('caching')}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="subtitle1">Caching</Typography>
+                        <InfoIcon color="action" fontSize="small" />
+                      </Box>
+                      <Typography variant="body2">
+                        ElastiCache: {formatCurrency(300 * (nodeConfigEnabled ? formData.nodes.elasticache_nodes_per_region : defaultNodeConfig.elasticache_nodes_per_region))}
+                      </Typography>
+                      <Typography variant="body2">
+                        DynamoDB Accelerator (DAX): {formatCurrency(200 * (nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes))}
+                      </Typography>
+                      <Typography variant="h6" sx={{ mt: 1 }}>
+                        Total: {formatCurrency((
+                          (300 * (nodeConfigEnabled ? formData.nodes.elasticache_nodes_per_region : defaultNodeConfig.elasticache_nodes_per_region)) + 
+                          (200 * (nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes))
+                        ) * (
+                          formData.region === 'us-east-1' ? 1.0 :
+                          formData.region === 'us-west-2' ? 1.05 :
+                          formData.region === 'eu-west-1' ? 1.12 :
+                          formData.region === 'ap-southeast-1' ? 1.15 : 1.0
+                        ))}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Paper elevation={3} sx={{ p: 2, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                      <Typography variant="h6">
+                        Total {costPeriod.charAt(0).toUpperCase() + costPeriod.slice(1)} Cost: {formatCurrency(getTotalCost())}
+                      </Typography>
+                      <Typography variant="subtitle1">
+                        Cost per Tenant: {formatCurrency(
+                          getTotalCost() /
+                          (scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants)
+                        )}
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+
+                <CostDetailModal />
+              </Box>
+            )}
           </Box>
+        ) : (
+          <CostReport
+            formData={formData}
+            costBreakdown={costBreakdown}
+            scaleConfigEnabled={scaleConfigEnabled}
+            networkLoadEnabled={networkLoadEnabled}
+            nodeConfigEnabled={nodeConfigEnabled}
+            defaultNodeConfig={defaultNodeConfig}
+            minimalConfig={minimalConfig}
+            networkLoadConfig={networkLoadConfig}
+            storageCosts={storageCosts}
+            costPeriod={costPeriod}
+          />
         )}
 
         <Snackbar

@@ -1,6 +1,6 @@
 {
-  "short_name": "Cost Calculator",
-  "name": "Cloud Infrastructure Cost Calculator",
+  "short_name": "CloudConnect",
+  "name": "CloudConnect Infrastructure Expense Estimator",
   "icons": [
     {
       "src": "favicon.ico",
