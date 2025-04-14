@@ -8,11 +8,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/app:/app/app
-      - ./backend/services:/app/services
-      - ./backend/models:/app/models
-      - ./backend/utils:/app/utils
-      - ./backend/pricing_data.json:/app/pricing_data.json
+      - ./backend:/app
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
@@ -32,17 +28,25 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
     environment:
       - REACT_APP_API_URL=http://localhost:8000
       - WDS_SOCKET_PORT=0
       - CI=false
       - PORT=3000
+      - CHOKIDAR_USEPOLLING=true
     depends_on:
       backend:
         condition: service_healthy
     networks:
       - app-network
     restart: unless-stopped
+    user: "${UID:-1000}:${GID:-1000}"
+
+volumes:
+  frontend-node-modules:
 
 networks:
   app-network:
