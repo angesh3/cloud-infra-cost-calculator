@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for launching EC2 instance with Docker'
+
+Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+
+Resources:
+  DockerInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      SecurityGroups: 
+        - !Ref DockerSecurityGroup
+      KeyName: !Ref KeyName
+      ImageId: ami-0440d3b780d96b29d  # Amazon Linux 2023 AMI (us-east-1)
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          yum update -y
+          yum install -y docker git
+          systemctl start docker
+          systemctl enable docker
+          usermod -a -G docker ec2-user
+          curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          chmod +x /usr/local/bin/docker-compose
+          su - ec2-user -c "git clone https://github.com/angesh3/cloud-infra-cost-calculator.git"
+          su - ec2-user -c "cd cloud-infra-cost-calculator && git checkout v1-3 && docker-compose up -d"
+      Tags:
+        - Key: Name
+          Value: Docker-CostCalculator
+
+  DockerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH, HTTP and app ports
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+
+Outputs:
+  InstancePublicDNS:
+    Description: Public DNS name of the EC2 instance
+    Value: !GetAtt DockerInstance.PublicDnsName
+  FrontendURL:
+    Description: URL for the frontend application
+    Value: !Sub http://${DockerInstance.PublicDnsName}:3000
+  BackendURL:
+    Description: URL for the backend API
+    Value: !Sub http://${DockerInstance.PublicDnsName}:8000 
