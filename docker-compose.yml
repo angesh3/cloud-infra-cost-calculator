@@ -33,7 +33,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_API_URL=http://${PUBLIC_IP:-localhost}:8000
       - WDS_SOCKET_PORT=0
       - CI=false
       - PORT=3000
