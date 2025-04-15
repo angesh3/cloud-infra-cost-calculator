@@ -962,7 +962,7 @@ function CostCalculator() {
             details: [
               'Daily Message Cost:',
               `- Base Messages per day: ${currentConfig.messages.events_per_day.toLocaleString()}`,
-              `- Total Messages per day: ${messages_per_day.toLocaleString()} (${currentConfig.messages.events_per_day.toLocaleString()} × ${total_consumers.toLocaleString()} consumers)`,
+              `- Total Messages per day: ${messages_per_day.toLocaleString()} (${currentConfig.messages.events_per_day.toLocaleString()} × ${total_tenants.toLocaleString()} tenants)`,
               `- Cost per million messages: $9.25`,
               `- Daily message cost: ${formatCurrency(daily_message_cost)}`,
               '',
