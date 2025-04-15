@@ -422,7 +422,7 @@ function CostCalculator() {
       
       console.log('DEBUG: Sending request with data:', JSON.stringify(requestData, null, 2));
       
-      const response = await axios.post('http://localhost:8000/calculate-cost', requestData);
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/calculate-cost`, requestData);
       console.log('DEBUG: Received response:', JSON.stringify(response.data, null, 2));
       
       // Verify the region in the response
