@@ -26,9 +26,10 @@ const CostReport = ({
   costPeriod
 }) => {
   const formatCurrency = (value) => {
-    if (isNaN(value)) return '$0.00';
-    const formattedValue = value.toFixed(3);
-    return `$${formattedValue}`;
+    // Convert to number and handle invalid/null/undefined values
+    const numValue = Number(value);
+    if (isNaN(numValue)) return '$0.00';
+    return `$${numValue.toFixed(2)}`;
   };
 
   const getRegionMultiplier = (region) => {
@@ -286,17 +287,28 @@ const CostReport = ({
   };
 
   const getAllCosts = () => {
+    const networkDataLoadCosts = getNetworkDataLoadCosts();
+    const storageCosts = getStorageCosts();
+    const containerCosts = getContainerCosts();
+    const networkCosts = getNetworkCosts();
+    const cloudInfraCosts = getCloudInfraCosts();
+    const securityCosts = getSecurityCosts();
+    const monitoringCosts = getMonitoringCosts();
+    const loadBalancerCosts = getLoadBalancerCosts();
+    const containerManagementCosts = getContainerManagementCosts();
+    const cachingCosts = getCachingCosts();
+
     return [
-      ...getNetworkDataLoadCosts(),
-      ...getStorageCosts(),
-      ...getContainerCosts(),
-      ...getNetworkCosts(),
-      ...getCloudInfraCosts(),
-      ...getSecurityCosts(),
-      ...getMonitoringCosts(),
-      ...getLoadBalancerCosts(),
-      ...getContainerManagementCosts(),
-      ...getCachingCosts()
+      ...networkDataLoadCosts,
+      ...storageCosts,
+      ...containerCosts,
+      ...networkCosts,
+      ...cloudInfraCosts,
+      ...securityCosts,
+      ...monitoringCosts,
+      ...loadBalancerCosts,
+      ...containerManagementCosts,
+      ...cachingCosts
     ];
   };
 
@@ -323,14 +335,20 @@ const CostReport = ({
 
   const getTotalCost = () => {
     if (!costBreakdown) return 0;
+
     const costs = getAllCosts();
-    return costs.reduce((total, item) => total + item.finalCost, 0);
+    const total = costs.reduce((sum, item) => {
+      const itemCost = Number(item.finalCost) || 0;
+      return sum + itemCost;
+    }, 0);
+    
+    return total;
   };
 
   const getCostPerTenant = () => {
-    const totalCost = getTotalCost();
-    const tenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
-    return totalCost / tenants;
+    const total = getTotalCost();
+    const numTenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
+    return numTenants > 0 ? total / numTenants : total;
   };
 
   if (!costBreakdown) {
@@ -358,6 +376,15 @@ const CostReport = ({
         </Button>
       </Box>
 
+      <Box sx={{ mb: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
+        <Typography variant="body1">
+          Total Cost: {formatCurrency(getTotalCost())} <Typography component="span" color="text.secondary">Monthly total across all services</Typography>
+        </Typography>
+        <Typography variant="body1">
+          Cost per Tenant: {formatCurrency(getCostPerTenant())} <Typography component="span" color="text.secondary">Total cost divided by number of tenants ({scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants})</Typography>
+        </Typography>
+      </Box>
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -381,24 +408,6 @@ const CostReport = ({
                 <TableCell>{item.notes}</TableCell>
               </TableRow>
             ))}
-            <TableRow>
-              <TableCell colSpan={4} align="right" sx={{ fontWeight: 'bold' }}>
-                Total Cost:
-              </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 'bold' }}>
-                {formatCurrency(getTotalCost())}
-              </TableCell>
-              <TableCell>Monthly total across all services</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell colSpan={4} align="right" sx={{ fontWeight: 'bold' }}>
-                Cost per Tenant:
-              </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 'bold' }}>
-                {formatCurrency(getCostPerTenant())}
-              </TableCell>
-              <TableCell>Total cost divided by number of tenants ({scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants})</TableCell>
-            </TableRow>
           </TableBody>
         </Table>
       </TableContainer>

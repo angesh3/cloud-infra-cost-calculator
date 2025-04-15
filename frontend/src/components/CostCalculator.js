@@ -40,6 +40,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import InfoIcon from '@mui/icons-material/Info';
 import axios from 'axios';
 import CostReport from './CostReport';
+import RegionReport from './RegionReport';
 import {
   LineChart,
   Line,
@@ -437,6 +438,7 @@ function CostCalculator() {
         console.error('Region mismatch - Sent:', data.region, 'Received:', response.data.metadata?.region);
       }
       
+      console.log(response.data);
       setCostBreakdown(response.data);
       setCloudConfigModalOpen(false);
       setNotification({
@@ -1906,7 +1908,7 @@ function CostCalculator() {
     );
     
     // Calculate total monthly cost
-    const totalMonthlyCost = 
+    const totalMonthlyCost = Number(
       networkDataLoadCost +
       storageCost +
       containerCost +
@@ -1917,9 +1919,10 @@ function CostCalculator() {
       monitoringCost +
       loadBalancerCost +
       containerManagementCost +
-      cachingCost;
+      cachingCost
+    ).toFixed(2);
     
-    return totalMonthlyCost;
+    return parseFloat(totalMonthlyCost);
   };
 
   const renderStorageCosts = () => {
@@ -2035,9 +2038,18 @@ function CostCalculator() {
 
     // Global costs (not multiplied by number of regions)
     const globalCosts = {
-      networkDataLoad: ((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : minimalConfig.network_load.messages.events_per_day) * 
-                      (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
-                      minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) / 1000000 * 9.25 * 30) || 0,
+      networkDataLoad:  (
+        ((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : minimalConfig.network_load.messages.events_per_day) * 
+        (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+        minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) / 1000000 * 9.25 * 30 +
+        (networkLoadEnabled ? networkLoadConfig.api.calls_per_day : minimalConfig.network_load.api.calls_per_day) * 
+        (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+        minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) * 0.00189 * 30) *
+        (formData.region === 'us-east-1' ? 1.0 :
+         formData.region === 'us-west-2' ? 1.05 :
+         formData.region === 'eu-west-1' ? 1.12 :
+         formData.region === 'ap-southeast-1' ? 1.15 : 1.0)
+      ) || 0,
       storage: (storageCosts?.dynamodb_final_cost || 0) + (storageCosts?.s3_final_cost || 0),
       containers: (73 + (71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100)))) || 0,
       network: (costBreakdown?.breakdown?.network?.throughput_cost || 0) + (costBreakdown?.breakdown?.network?.msk_cost || 0),
@@ -2233,31 +2245,29 @@ function CostCalculator() {
         </Paper>
 
         {/* 3. Region Scale-based Costs */}
-        <Paper sx={{ p: 2, mb: 2 }}>
-          <Typography variant="subtitle1" gutterBottom>
-            3. Region Scale-based Costs (Global)
-          </Typography>
-          <List>
-            <ListItem>
-              <ListItemText 
-                primary="Infrastructure Management" 
-                secondary={formatCurrency(costs.infrastructureManagement || 0)}
-              />
-            </ListItem>
-            <ListItem>
-              <ListItemText 
-                primary="Container Management" 
-                secondary={formatCurrency(costs.containerManagement || 0)}
-              />
-            </ListItem>
-            <ListItem>
-              <ListItemText 
-                primary={<Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Subtotal</Typography>}
-                secondary={<Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(costs.total.regionScale || 0)}</Typography>}
-              />
-            </ListItem>
-          </List>
-        </Paper>
+        <Typography variant="h6" gutterBottom>
+          3. Global Infra Costs (Global)
+        </Typography>
+        <List>
+          <ListItem>
+            <ListItemText 
+              primary="Infrastructure Management" 
+              secondary={formatCurrency(costs.infrastructureManagement || 0)}
+            />
+          </ListItem>
+          <ListItem>
+            <ListItemText 
+              primary="Container Management" 
+              secondary={formatCurrency(costs.containerManagement || 0)}
+            />
+          </ListItem>
+          <ListItem>
+            <ListItemText 
+              primary={<Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Subtotal</Typography>}
+              secondary={<Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(costs.total.regionScale || 0)}</Typography>}
+            />
+          </ListItem>
+        </List>
 
         {/* Total Multi-Region Monthly Cost */}
         <Box sx={{ mt: 4, mb: 4 }}>
@@ -2269,6 +2279,17 @@ function CostCalculator() {
         </Box>
       </Box>
     );
+  };
+
+  // Update the report section to use the same calculation
+  const generateReport = () => {
+    const totalCost = getTotalCost();
+    const numTenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
+    
+    return {
+      total: totalCost,
+      perTenant: numTenants > 0 ? totalCost / numTenants : totalCost
+    };
   };
 
   return (
@@ -2284,6 +2305,7 @@ function CostCalculator() {
           <Tabs value={activeTab} onChange={handleTabChange}>
             <Tab label="Calculator" />
             <Tab label="Report" />
+            <Tab label="Region Report" />
             <Tab label="Cost Trend Compass" />
           </Tabs>
         </Box>
@@ -3219,31 +3241,29 @@ function CostCalculator() {
                 </Paper>
 
                 {/* 3. Region Scale-based Costs */}
-                <Paper sx={{ p: 2, mb: 2 }}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    3. Region Scale-based Costs (Global)
-                  </Typography>
-                  <List>
-                    <ListItem>
-                      <ListItemText 
-                        primary="Infrastructure Management" 
-                        secondary={formatCurrency(getMultiRegionCosts().infrastructureManagement || 0)}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText 
-                        primary="Container Management" 
-                        secondary={formatCurrency(getMultiRegionCosts().containerManagement || 0)}
-                      />
-                    </ListItem>
-                    <ListItem>
-                      <ListItemText 
-                        primary={<Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Subtotal</Typography>}
-                        secondary={<Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(getMultiRegionCosts().total.regionScale || 0)}</Typography>}
-                      />
-                    </ListItem>
-                  </List>
-                </Paper>
+                <Typography variant="h6" gutterBottom>
+                  3. Global Infra Costs (Global)
+                </Typography>
+                <List>
+                  <ListItem>
+                    <ListItemText 
+                      primary="Infrastructure Management" 
+                      secondary={formatCurrency(getMultiRegionCosts().infrastructureManagement || 0)}
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText 
+                      primary="Container Management" 
+                      secondary={formatCurrency(getMultiRegionCosts().containerManagement || 0)}
+                    />
+                  </ListItem>
+                  <ListItem>
+                    <ListItemText 
+                      primary={<Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Subtotal</Typography>}
+                      secondary={<Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(getMultiRegionCosts().total.regionScale || 0)}</Typography>}
+                    />
+                  </ListItem>
+                </List>
                 {/* Total Multi-Region Monthly Cost */}
                 <Box sx={{ mt: 4, mb: 4 }}>
                   <Paper sx={{ p: 3, bgcolor: '#2196f3', color: 'white', boxShadow: 3 }}>
@@ -3259,6 +3279,21 @@ function CostCalculator() {
           <CostReport 
             costBreakdown={costBreakdown}
             formData={formData}
+            scaleConfigEnabled={scaleConfigEnabled}
+            networkLoadEnabled={networkLoadEnabled}
+            nodeConfigEnabled={nodeConfigEnabled}
+            defaultNodeConfig={defaultNodeConfig}
+            minimalConfig={minimalConfig}
+            networkLoadConfig={networkLoadConfig}
+            storageCosts={storageCosts}
+            costPeriod={costPeriod}
+            generateReport={generateReport}
+          />
+        ) : activeTab === 2 ? (
+          <RegionReport
+            formData={formData}
+            costBreakdown={costBreakdown}
+            totalRegions={totalRegions}
             scaleConfigEnabled={scaleConfigEnabled}
             networkLoadEnabled={networkLoadEnabled}
             nodeConfigEnabled={nodeConfigEnabled}
