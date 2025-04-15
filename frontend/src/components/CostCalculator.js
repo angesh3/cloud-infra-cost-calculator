@@ -31,7 +31,10 @@ import {
   CardContent,
   Tabs,
   Tab,
-  LinearProgress
+  CircularProgress,
+  List,
+  ListItem,
+  ListItemText
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import InfoIcon from '@mui/icons-material/Info';
@@ -316,6 +319,10 @@ function CostCalculator() {
   // Add new state for tab control
   const [activeTab, setActiveTab] = useState(0);
 
+  const [regionalScaleEnabled, setRegionalScaleEnabled] = useState(false);
+  const [regionalScaleModalOpen, setRegionalScaleModalOpen] = useState(false);
+  const [totalRegions, setTotalRegions] = useState(1);
+
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -493,169 +500,32 @@ function CostCalculator() {
   };
 
   const formatCurrency = (value) => {
-    if (value === undefined || value === null) {
-      return '$0.000';
-    }
-    const multiplier = costPeriod === 'yearly' ? 12 : costPeriod === 'daily' ? 1/30 : 1;
-    return `$${(Number(value) * multiplier).toFixed(3)}`;
-  };
-
-  // Add a safe number formatting helper
-  const safeFormatCurrency = (value) => {
-    if (value === undefined || value === null || isNaN(value)) {
-      return '$0.00';
-    }
-    return formatCurrency(value);
-  };
-
-  const getDynamoDBDetails = (dynamodb_cost, formData) => {
-    const region_multiplier = formData.region === 'us-east-1' ? 1.0 :
-                            formData.region === 'us-west-2' ? 1.05 :
-                            formData.region === 'eu-west-1' ? 1.12 :
-                            formData.region === 'ap-southeast-1' ? 1.15 : 1.0;
-
-    // Constants - use minimal config if scale is not enabled
-    const total_items = scaleConfigEnabled ? 
-                       (formData.scale.total_tenants * formData.scale.endpoints_per_tenant) :
-                       (minimalConfig.scale.total_tenants * minimalConfig.scale.endpoints_per_tenant);
-    
-    const storage_gb = (total_items * 4) / (1024 * 1024); // 4KB per item
-    const daily_writes = networkLoadEnabled ? 
-                        networkLoadConfig.messages.events_per_day + networkLoadConfig.api.calls_per_day :
-                        1;
-    const daily_reads = daily_writes * 2;
-    const monthly_writes = daily_writes * 30;
-    const monthly_reads = daily_reads * 30;
-    
-    // Use fixed base cost for minimal configuration
-    const base_cost = 0.03;  // Fixed base cost
-    const final_cost = base_cost * region_multiplier;  // Calculate final cost with multiplier
-    
-    const displayTenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
-    const displayEndpoints = scaleConfigEnabled ? formData.scale.endpoints_per_tenant : minimalConfig.scale.endpoints_per_tenant;
-    
-    return [
-      {
-        title: 'Storage Cost Calculation',
-        items: [
-          {
-            label: 'Total Items',
-            value: total_items.toLocaleString(),
-            details: [
-              `Number of tenants: ${displayTenants.toLocaleString()}`,
-              `Endpoints per tenant: ${displayEndpoints.toLocaleString()}`,
-              `Total items = ${displayTenants.toLocaleString()} × ${displayEndpoints.toLocaleString()} = ${total_items.toLocaleString()}`
-            ]
-          },
-          {
-            label: 'Storage Size',
-            value: `${storage_gb.toFixed(2)} GB`,
-            details: [
-              'Item size: 4 KB',
-              `Total storage = (${total_items.toLocaleString()} items × 4 KB) / (1024 × 1024)`,
-              `= ${storage_gb.toFixed(2)} GB`
-            ]
-          }
-        ]
-      },
-      {
-        title: 'Write Operations Cost',
-        items: [
-          {
-            label: 'Daily Write Operations',
-            value: daily_writes.toLocaleString(),
-            details: [
-              `Messages per day: ${networkLoadEnabled ? networkLoadConfig.messages.events_per_day.toLocaleString() : '1'}`,
-              `API calls per day: ${networkLoadEnabled ? networkLoadConfig.api.calls_per_day.toLocaleString() : '1'}`,
-              `Total daily writes = ${networkLoadEnabled ? 
-                `${networkLoadConfig.messages.events_per_day.toLocaleString()} + ${networkLoadConfig.api.calls_per_day.toLocaleString()}` : 
-                '1'} = ${daily_writes.toLocaleString()}`
-            ]
-          },
-          {
-            label: 'Monthly Write Operations',
-            value: monthly_writes.toLocaleString(),
-            details: [
-              `Daily writes × 30 days`,
-              `${daily_writes.toLocaleString()} × 30 = ${monthly_writes.toLocaleString()} operations`
-            ]
-          }
-        ]
-      },
-      {
-        title: 'Read Operations Cost',
-        items: [
-          {
-            label: 'Daily Read Operations',
-            value: daily_reads.toLocaleString(),
-            details: [
-              'Assuming 2 reads per write',
-              `Daily reads = ${daily_writes.toLocaleString()} × 2`,
-              `= ${daily_reads.toLocaleString()} operations`
-            ]
-          },
-          {
-            label: 'Monthly Read Operations',
-            value: monthly_reads.toLocaleString(),
-            details: [
-              `Daily reads × 30 days`,
-              `${daily_reads.toLocaleString()} × 30 = ${monthly_reads.toLocaleString()} operations`
-            ]
-          }
-        ]
-      },
-      {
-        title: 'Final Cost (After Region Multiplier)',
-        items: [
-          {
-            label: 'Base cost',
-            value: formatCurrency(base_cost),
-            details: [
-              'Fixed base cost for minimal configuration: $0.03'
-            ]
-          },
-          {
-            label: `Region multiplier (${formData.region})`,
-            value: `${region_multiplier}x`,
-            details: []
-          },
-          {
-            label: 'Final cost',
-            value: formatCurrency(final_cost),
-            details: [
-              `${formatCurrency(base_cost)} × ${region_multiplier}`,
-              `= ${formatCurrency(final_cost)}`
-            ]
-          }
-        ]
-      }
-    ];
+    if (value === undefined || value === null) return '$0';
+    return `$${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const getStorageDetails = () => {
+    // Calculate storage sizes for display
+    const total_items = scaleConfigEnabled ? 
+                       (formData.scale.total_tenants * formData.scale.endpoints_per_tenant) :
+                       (minimalConfig.scale.total_tenants * minimalConfig.scale.endpoints_per_tenant);
+    const storage_gb = (total_items * 4) / (1024 * 1024);
+    
+    const daily_messages = networkLoadEnabled ? networkLoadConfig.messages.events_per_day : minimalConfig.network_load.messages.events_per_day;
+    const message_size_kb = networkLoadEnabled ? networkLoadConfig.messages.message_size_kb : minimalConfig.network_load.messages.message_size_kb;
+    const monthly_storage_gb = (daily_messages * message_size_kb * 30) / (1024 * 1024);
+
     const region_multiplier = formData.region === 'us-east-1' ? 1.0 :
                             formData.region === 'us-west-2' ? 1.05 :
                             formData.region === 'eu-west-1' ? 1.12 :
                             formData.region === 'ap-southeast-1' ? 1.15 : 1.0;
 
-    // Calculate DynamoDB costs
-    const total_items = scaleConfigEnabled ? 
-                       (formData.scale.total_tenants * formData.scale.endpoints_per_tenant) :
-                       (minimalConfig.scale.total_tenants * minimalConfig.scale.endpoints_per_tenant);
-    const storage_gb = (total_items * 4) / (1024 * 1024); // 4KB per item
+    // Calculate costs
     const dynamodb_storage_cost = storage_gb * 0.25; // $0.25 per GB-month
     const dynamodb_final_cost = dynamodb_storage_cost * region_multiplier;
-
-    // Calculate S3 costs
-    const daily_messages = networkLoadEnabled ? networkLoadConfig.messages.events_per_day : 1;
-    const message_size_kb = networkLoadEnabled ? networkLoadConfig.messages.message_size_kb : 1;
-    const monthly_storage_gb = (daily_messages * message_size_kb * 30) / (1024 * 1024);
+    
     const s3_storage_cost = monthly_storage_gb * 0.023; // $0.023 per GB-month
     const s3_final_cost = s3_storage_cost * region_multiplier;
-
-    // Get current configuration values
-    const displayTenants = scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants;
-    const displayEndpoints = scaleConfigEnabled ? formData.scale.endpoints_per_tenant : minimalConfig.scale.endpoints_per_tenant;
 
     return [
       {
@@ -665,21 +535,12 @@ function CostCalculator() {
             label: 'Configuration',
             value: scaleConfigEnabled ? 'Custom' : 'Minimal',
             details: [
-              `Total Tenants: ${displayTenants.toLocaleString()}`,
-              `Endpoints per Tenant: ${displayEndpoints.toLocaleString()}`,
-              `Total Items: ${total_items.toLocaleString()} (${displayTenants.toLocaleString()} × ${displayEndpoints.toLocaleString()})`,
+              `Total Tenants: ${scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants}`,
+              `Endpoints per Tenant: ${scaleConfigEnabled ? formData.scale.endpoints_per_tenant : minimalConfig.scale.endpoints_per_tenant}`,
+              `Total Items: ${total_items.toLocaleString()} (${scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants} × ${scaleConfigEnabled ? formData.scale.endpoints_per_tenant : minimalConfig.scale.endpoints_per_tenant})`,
               `Storage per Item: 4 KB`,
-              `Total Storage: ${storage_gb.toFixed(3)} GB`
-            ]
-          },
-          {
-            label: 'Cost Calculation',
-            value: formatCurrency(dynamodb_final_cost),
-            details: [
-              `Storage Rate: $0.25 per GB-month`,
-              `Base Storage Cost: ${formatCurrency(dynamodb_storage_cost)}`,
-              `Region Multiplier (${formData.region}): ${region_multiplier}x`,
-              `Final Cost: ${formatCurrency(dynamodb_final_cost)}`
+              `Total Storage: ${storage_gb.toFixed(3)} GB`,
+              `Storage Cost: ${formatCurrency(dynamodb_final_cost)} per month`
             ]
           }
         ]
@@ -688,46 +549,28 @@ function CostCalculator() {
         title: 'S3 Storage Details',
         items: [
           {
-            label: 'Configuration',
-            value: networkLoadEnabled ? 'Custom' : 'Minimal',
+            label: 'Message Storage',
+            value: formatCurrency(s3_final_cost),
             details: [
               `Daily Messages: ${daily_messages.toLocaleString()}`,
               `Message Size: ${message_size_kb} KB`,
-              `Monthly Storage: ${monthly_storage_gb.toFixed(3)} GB`
-            ]
-          },
-          {
-            label: 'Cost Calculation',
-            value: formatCurrency(s3_final_cost),
-            details: [
-              `Storage Rate: $0.023 per GB-month`,
-              `Base Storage Cost: ${formatCurrency(s3_storage_cost)}`,
-              `Region Multiplier (${formData.region}): ${region_multiplier}x`,
-              `Final Cost: ${formatCurrency(s3_final_cost)}`
+              `Monthly Storage: ${monthly_storage_gb.toFixed(3)} GB`,
+              `Storage Cost: ${formatCurrency(s3_final_cost)} per month`
             ]
           }
         ]
       },
       {
-        title: 'Total Storage Cost',
+        title: 'Total Storage Costs',
         items: [
           {
-            label: 'DynamoDB Storage',
-            value: formatCurrency(dynamodb_final_cost),
-            details: [`${storage_gb.toFixed(3)} GB at ${formatCurrency(dynamodb_final_cost)}`]
-          },
-          {
-            label: 'S3 Storage',
-            value: formatCurrency(s3_final_cost),
-            details: [`${monthly_storage_gb.toFixed(3)} GB at ${formatCurrency(s3_final_cost)}`]
-          },
-          {
-            label: 'Total Cost',
+            label: 'Monthly Cost Breakdown',
             value: formatCurrency(dynamodb_final_cost + s3_final_cost),
             details: [
-              `DynamoDB: ${formatCurrency(dynamodb_final_cost)}`,
-              `S3: ${formatCurrency(s3_final_cost)}`,
-              `Total: ${formatCurrency(dynamodb_final_cost + s3_final_cost)}`
+              `DynamoDB Storage: ${formatCurrency(dynamodb_final_cost)}`,
+              `S3 Storage: ${formatCurrency(s3_final_cost)}`,
+              `Region Multiplier (${formData.region}): ${region_multiplier}x`,
+              `Total Monthly Cost: ${formatCurrency(dynamodb_final_cost + s3_final_cost)}`
             ]
           }
         ]
@@ -1043,118 +886,117 @@ function CostCalculator() {
     const final_cost = total_base_cost * region_multiplier;
 
     return [
-        {
-            title: 'NAT Gateway Details',
-            items: [
-                {
-                    label: 'NAT Gateway Base Cost',
-                    value: formatCurrency(nat_gateway_cost),
-                    details: [
-                        'NAT Gateway for outbound internet access',
-                        'Base cost: $32 per month',
-                        'Includes:',
-                        '- NAT Gateway hourly charges ($0.045 per hour)',
-                        '- Data processing fees ($0.045 per GB)',
-                        '- High availability configuration across AZs'
-                    ]
-                }
+      {
+        title: 'NAT Gateway Details',
+        items: [
+          {
+            label: 'NAT Gateway Base Cost',
+            value: formatCurrency(nat_gateway_cost),
+            details: [
+              'NAT Gateway for outbound internet access',
+              'Base cost: $32 per month',
+              'Includes:',
+              '- NAT Gateway hourly charges ($0.045 per hour)',
+              '- Data processing fees ($0.045 per GB)',
+              '- High availability configuration across AZs'
             ]
-        },
-        {
-            title: 'VPC Endpoints Details',
-            items: [
-                {
-                    label: 'VPC Endpoints Base Cost',
-                    value: formatCurrency(vpc_endpoints_cost),
-                    details: [
-                        'VPC Interface Endpoints',
-                        'Base cost: $100 per month',
-                        'Includes:',
-                        '- Interface endpoints for AWS services ($0.014 per endpoint-hour)',
-                        '- Data processing through endpoints ($0.01 per GB)',
-                        '- High availability across AZs',
-                        '- Support for multiple services (S3, DynamoDB, etc.)'
-                    ]
-                }
+          }
+        ]
+      },
+      {
+        title: 'VPC Endpoints Details',
+        items: [
+          {
+            label: 'VPC Endpoints Base Cost',
+            value: formatCurrency(vpc_endpoints_cost),
+            details: [
+              'VPC Interface Endpoints',
+              'Base cost: $100 per month',
+              'Includes:',
+              '- Interface endpoints for AWS services ($0.014 per endpoint-hour)',
+              '- Data processing through endpoints ($0.01 per GB)',
+              '- High availability across AZs',
+              '- Support for multiple services (S3, DynamoDB, etc.)'
             ]
-        },
-        {
-            title: 'Transit Gateway Details',
-            items: [
-                {
-                    label: 'Transit Gateway Base Cost',
-                    value: formatCurrency(transit_gateway_cost),
-                    details: [
-                        'AWS Transit Gateway',
-                        'Base cost: $73 per month',
-                        'Includes:',
-                        '- Transit Gateway hourly charges ($0.05 per hour)',
-                        '- VPC attachment costs ($0.05 per attachment-hour)',
-                        '- Data processing ($0.02 per GB)',
-                        '- Inter-VPC routing capabilities'
-                    ]
-                }
+          }
+        ]
+      },
+      {
+        title: 'Transit Gateway Details',
+        items: [
+          {
+            label: 'Transit Gateway Base Cost',
+            value: formatCurrency(transit_gateway_cost),
+            details: [
+              'AWS Transit Gateway',
+              'Base cost: $73 per month',
+              'Includes:',
+              '- Transit Gateway hourly charges ($0.05 per hour)',
+              '- VPC attachment costs ($0.05 per attachment-hour)',
+              '- Data processing ($0.02 per GB)',
+              '- Inter-VPC routing capabilities'
             ]
-        },
-        {
-            title: 'Route 53 Details',
-            items: [
-                {
-                    label: 'Route 53 Base Cost',
-                    value: formatCurrency(route53_cost),
-                    details: [
-                        'Amazon Route 53 DNS Service',
-                        'Base cost: $15 per month',
-                        'Includes:',
-                        '- Hosted zone maintenance ($0.50 per hosted zone)',
-                        '- DNS queries ($0.40 per million queries)',
-                        '- Health checks ($0.50 per health check)',
-                        '- DNS failover configuration'
-                    ]
-                }
+          }
+        ]
+      },
+      {
+        title: 'Route 53 Details',
+        items: [
+          {
+            label: 'Route 53 Base Cost',
+            value: formatCurrency(route53_cost),
+            details: [
+              'Amazon Route 53 DNS Service',
+              'Base cost: $15 per month',
+              'Includes:',
+              '- Hosted zone maintenance ($0.50 per hosted zone)',
+              '- DNS queries ($0.40 per million queries)',
+              '- Health checks ($0.50 per health check)',
+              '- DNS failover configuration'
             ]
-        },
-        {
-            title: 'Cost Summary',
-            items: [
-                {
-                    label: 'Base Costs Breakdown',
-                    value: formatCurrency(total_base_cost),
-                    details: [
-                        `NAT Gateway: ${formatCurrency(nat_gateway_cost)}`,
-                        `VPC Endpoints: ${formatCurrency(vpc_endpoints_cost)}`,
-                        `Transit Gateway: ${formatCurrency(transit_gateway_cost)}`,
-                        `Route 53: ${formatCurrency(route53_cost)}`,
-                        `Total base cost: ${formatCurrency(total_base_cost)}`
-                    ]
-                },
-                {
-                    label: `Region Multiplier (${formData.region})`,
-                    value: `${region_multiplier}x`,
-                    details: [
-                        `Selected region: ${formData.region}`,
-                        `Region multiplier: ${region_multiplier}x`,
-                        'Region multipliers:',
-                        '- us-east-1: 1.00x (base)',
-                        '- us-west-2: 1.05x',
-                        '- eu-west-1: 1.12x',
-                        '- ap-southeast-1: 1.15x'
-                    ]
-                },
-                {
-                    label: 'Final Monthly Cost',
-                    value: formatCurrency(final_cost),
-                    details: [
-                        `Base cost: ${formatCurrency(total_base_cost)}`,
-                        `Region multiplier: ${region_multiplier}x`,
-                        `Final cost = ${formatCurrency(total_base_cost)} × ${region_multiplier}`,
-                        `= ${formatCurrency(final_cost)}`
-                    ]
-                }
+          }
+        ]
+      },
+      {
+        title: 'Cost Summary',
+        items: [
+          {
+            label: 'Base Costs Breakdown',
+            value: formatCurrency(total_base_cost),
+            details: [
+              `NAT Gateway: ${formatCurrency(nat_gateway_cost)}`,
+              `VPC Endpoints: ${formatCurrency(vpc_endpoints_cost)}`,
+              `Transit Gateway: ${formatCurrency(transit_gateway_cost)}`,
+              `Route 53: ${formatCurrency(route53_cost)}`,
+              `Total base cost: ${formatCurrency(total_base_cost)}`
             ]
-        }
+          },
+          {
+            label: `Region Multiplier (${formData.region})`,
+            value: `${region_multiplier}x`,
+            details: [
+              `Selected region: ${formData.region}`,
+              `Region multiplier: ${region_multiplier}x`,
+              'Region multipliers:',
+              '- us-east-1: 1.00x (base)',
+              '- us-west-2: 1.05x',
+              '- eu-west-1: 1.12x',
+              '- ap-southeast-1: 1.15x'
+            ]
+          },
+          {
+            label: 'Final Monthly Cost',
+            value: formatCurrency(final_cost),
+            details: [
+              `Base cost: ${formatCurrency(total_base_cost)}`,
+              `Region multiplier: ${region_multiplier}x`,
+              `Final cost: ${formatCurrency(final_cost)}`
+            ]
+          }
+        ]
+      }
     ];
-};
+  };
 
   const getInfraManagementDetails = (costs) => {
     if (!costs) return [];
@@ -2120,6 +1962,315 @@ function CostCalculator() {
     setActiveTab(newValue);
   };
 
+  useEffect(() => {
+    if (scaleConfigEnabled) {
+      setFormData(prev => ({
+        ...prev,
+        scale: {
+          ...prev.scale,
+          total_tenants: minimalConfig.scale.total_tenants,
+          endpoints_per_tenant: minimalConfig.scale.endpoints_per_tenant
+        }
+      }));
+    }
+  }, [scaleConfigEnabled, minimalConfig.scale.total_tenants, minimalConfig.scale.endpoints_per_tenant]);
+
+  const handleRegionalScaleChange = (event) => {
+    setRegionalScaleEnabled(event.target.checked);
+    if (event.target.checked) {
+      setRegionalScaleModalOpen(true);
+    }
+  };
+
+  const getMultiRegionCosts = () => {
+    // Return early if costBreakdown is not available
+    if (!costBreakdown || !costBreakdown.breakdown) {
+      return {
+        caching: 0,
+        loadBalancer: 0,
+        securityTools: 0,
+        awsCloudInfra: {
+          natGateway: 0,
+          vpcEndpoints: 0,
+          transitGateway: 0,
+          route53: 0,
+          total: 0
+        },
+        networkDataLoad: 0,
+        storage: 0,
+        containers: 0,
+        network: 0,
+        monitoring: 0,
+        infrastructureManagement: 0,
+        containerManagement: 0,
+        total: {
+          regionBased: 0,
+          networkLoad: 0,
+          regionScale: 0,
+          overall: 0
+        }
+      };
+    }
+
+    // Base costs for region-specific components
+    const regionBasedCosts = {
+      caching: {
+        elasticache: 300 * (nodeConfigEnabled ? formData.nodes.elasticache_nodes_per_region : defaultNodeConfig.elasticache_nodes_per_region),
+        dynamodb: 200 * (nodeConfigEnabled ? formData.nodes.dynamodb_nodes : defaultNodeConfig.dynamodb_nodes),
+        total: 0
+      },
+      loadBalancer: 200.567,
+      securityTools: 3269,
+      awsCloudInfra: {
+        natGateway: 32,
+        vpcEndpoints: 100,
+        transitGateway: 73,
+        route53: 15,
+        total: 220
+      }
+    };
+
+    // Calculate total caching cost
+    regionBasedCosts.caching.total = regionBasedCosts.caching.elasticache + regionBasedCosts.caching.dynamodb;
+
+    // Global costs (not multiplied by number of regions)
+    const globalCosts = {
+      networkDataLoad: ((networkLoadEnabled ? networkLoadConfig.messages.events_per_day : minimalConfig.network_load.messages.events_per_day) * 
+                      (scaleConfigEnabled ? formData.scale.total_tenants * formData.scale.consumers_per_tenant : 
+                      minimalConfig.scale.total_tenants * minimalConfig.scale.consumers_per_tenant) / 1000000 * 9.25 * 30) || 0,
+      storage: (storageCosts?.dynamodb_final_cost || 0) + (storageCosts?.s3_final_cost || 0),
+      containers: (73 + (71.54 * Math.max(2, Math.floor((scaleConfigEnabled ? formData.scale.total_tenants : minimalConfig.scale.total_tenants) / 100)))) || 0,
+      network: (costBreakdown?.breakdown?.network?.throughput_cost || 0) + (costBreakdown?.breakdown?.network?.msk_cost || 0),
+      monitoring: 103.333,
+      infrastructureManagement: 278,
+      containerManagement: 100
+    };
+
+    // Apply region multiplier
+    const region_multiplier = formData.region === 'us-east-1' ? 1.0 :
+                            formData.region === 'us-west-2' ? 1.05 :
+                            formData.region === 'eu-west-1' ? 1.12 :
+                            formData.region === 'ap-southeast-1' ? 1.15 : 1.0;
+
+    // If regional scale is not enabled or total regions is 1 or less, return base costs
+    if (!regionalScaleEnabled || totalRegions <= 1) {
+      const singleRegionCosts = {
+        caching: regionBasedCosts.caching.total,
+        loadBalancer: regionBasedCosts.loadBalancer,
+        securityTools: regionBasedCosts.securityTools,
+        awsCloudInfra: regionBasedCosts.awsCloudInfra,
+        ...globalCosts,
+        total: {
+          regionBased: (
+            regionBasedCosts.caching.total +
+            regionBasedCosts.loadBalancer +
+            regionBasedCosts.securityTools +
+            regionBasedCosts.awsCloudInfra.total
+          ) * region_multiplier,
+          networkLoad: (
+            globalCosts.networkDataLoad +
+            globalCosts.storage +
+            globalCosts.containers +
+            globalCosts.network +
+            globalCosts.monitoring
+          ) * region_multiplier,
+          regionScale: (
+            globalCosts.infrastructureManagement +
+            globalCosts.containerManagement
+          ) * region_multiplier
+        }
+      };
+      singleRegionCosts.total.overall = 
+        singleRegionCosts.total.regionBased +
+        singleRegionCosts.total.networkLoad +
+        singleRegionCosts.total.regionScale;
+      return singleRegionCosts;
+    }
+
+    // Calculate multi-region costs
+    const multiRegionCosts = {
+      // Region-based costs (multiplied by number of regions)
+      caching: regionBasedCosts.caching.total * totalRegions * region_multiplier,
+      loadBalancer: regionBasedCosts.loadBalancer * totalRegions * region_multiplier,
+      securityTools: regionBasedCosts.securityTools * totalRegions * region_multiplier,
+      awsCloudInfra: {
+        natGateway: regionBasedCosts.awsCloudInfra.natGateway * totalRegions * region_multiplier,
+        vpcEndpoints: regionBasedCosts.awsCloudInfra.vpcEndpoints * totalRegions * region_multiplier,
+        transitGateway: regionBasedCosts.awsCloudInfra.transitGateway * totalRegions * region_multiplier,
+        route53: regionBasedCosts.awsCloudInfra.route53 * totalRegions * region_multiplier,
+        total: regionBasedCosts.awsCloudInfra.total * totalRegions * region_multiplier
+      },
+
+      // Global costs (not multiplied by number of regions)
+      ...globalCosts,
+
+      // Subtotals by category
+      total: {
+        regionBased: (
+          regionBasedCosts.caching.total +
+          regionBasedCosts.loadBalancer +
+          regionBasedCosts.securityTools +
+          regionBasedCosts.awsCloudInfra.total
+        ) * totalRegions * region_multiplier,
+        networkLoad: (
+          globalCosts.networkDataLoad +
+          globalCosts.storage +
+          globalCosts.containers +
+          globalCosts.network +
+          globalCosts.monitoring
+        ) * region_multiplier,
+        regionScale: (
+          globalCosts.infrastructureManagement +
+          globalCosts.containerManagement
+        ) * region_multiplier
+      }
+    };
+
+    // Calculate overall total
+    multiRegionCosts.total.overall = 
+      multiRegionCosts.total.regionBased +
+      multiRegionCosts.total.networkLoad +
+      multiRegionCosts.total.regionScale;
+
+    return multiRegionCosts;
+  };
+
+  const MultiRegionCostBreakdown = () => {
+    if (!regionalScaleEnabled) return null;
+    
+    const costs = getMultiRegionCosts();
+    // Return null if costs object is not properly initialized
+    if (!costs || !costs.total) return null;
+
+    return (
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h6" gutterBottom>
+          Multi-Region Cost Breakdown
+        </Typography>
+        
+        {/* 1. Region-based Infrastructure Costs */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            1. Region-based Infrastructure Costs (× {totalRegions} regions)
+          </Typography>
+          <List>
+            <ListItem>
+              <ListItemText 
+                primary="Caching" 
+                secondary={formatCurrency(costs.caching || 0)}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText 
+                primary="API & Load Balancing" 
+                secondary={formatCurrency(costs.loadBalancer || 0)}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText 
+                primary="Security Tools" 
+                secondary={formatCurrency(costs.securityTools || 0)}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText 
+                primary="AWS Cloud Infrastructure" 
+                secondary={formatCurrency(costs.awsCloudInfra?.total || 0)}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText 
+                primary={<Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Subtotal</Typography>}
+                secondary={<Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(costs.total.regionBased || 0)}</Typography>}
+              />
+            </ListItem>
+          </List>
+        </Paper>
+
+        {/* 2. Network Load-based Costs */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            2. Network Load-based Costs (Global)
+          </Typography>
+          <List>
+            <ListItem>
+              <ListItemText 
+                primary="Network Data Load" 
+                secondary={formatCurrency(costs.networkDataLoad || 0)}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText 
+                primary="Storage" 
+                secondary={formatCurrency(costs.storage || 0)}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText 
+                primary="Containers" 
+                secondary={formatCurrency(costs.containers || 0)}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText 
+                primary="Network" 
+                secondary={formatCurrency(costs.network || 0)}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText 
+                primary="Monitoring" 
+                secondary={formatCurrency(costs.monitoring || 0)}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText 
+                primary={<Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Subtotal</Typography>}
+                secondary={<Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(costs.total.networkLoad || 0)}</Typography>}
+              />
+            </ListItem>
+          </List>
+        </Paper>
+
+        {/* 3. Region Scale-based Costs */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Typography variant="subtitle1" gutterBottom>
+            3. Region Scale-based Costs (Global)
+          </Typography>
+          <List>
+            <ListItem>
+              <ListItemText 
+                primary="Infrastructure Management" 
+                secondary={formatCurrency(costs.infrastructureManagement || 0)}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText 
+                primary="Container Management" 
+                secondary={formatCurrency(costs.containerManagement || 0)}
+              />
+            </ListItem>
+            <ListItem>
+              <ListItemText 
+                primary={<Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Subtotal</Typography>}
+                secondary={<Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(costs.total.regionScale || 0)}</Typography>}
+              />
+            </ListItem>
+          </List>
+        </Paper>
+
+        {/* Total Multi-Region Monthly Cost */}
+        <Box sx={{ mt: 4, mb: 4 }}>
+          <Paper sx={{ p: 3, bgcolor: '#2196f3', color: 'white', boxShadow: 3 }}>
+            <Typography variant="h5" align="center" sx={{ fontWeight: 'bold' }}>
+              Total Multi-Region Monthly Cost: {formatCurrency(costs.total.overall || 0)}
+            </Typography>
+          </Paper>
+        </Box>
+      </Box>
+    );
+  };
+
   return (
     <Container maxWidth="lg">
       <Paper elevation={3} sx={{ p: 3, mt: 3 }}>
@@ -2240,6 +2391,24 @@ function CostCalculator() {
                       <Typography variant="body1">Configure Node Parameters</Typography>
                       <Typography variant="caption" color="text.secondary">
                         {nodeConfigEnabled ? 'Using custom configuration' : 'Using default values (2 nodes per region)'}
+                      </Typography>
+                    </Box>
+                  }
+                />
+
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={regionalScaleEnabled}
+                      onChange={handleRegionalScaleChange}
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body1">Configure Regional Scale</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {regionalScaleEnabled ? `Using ${totalRegions} regions` : 'Using single region'}
                       </Typography>
                     </Box>
                   }
@@ -2532,6 +2701,42 @@ function CostCalculator() {
                     onClick={() => setCloudConfigModalOpen(false)}
                   >
                     Close
+                  </Button>
+                </Box>
+              </Box>
+            </Modal>
+
+            <Modal
+              open={regionalScaleModalOpen}
+              onClose={() => setRegionalScaleModalOpen(false)}
+            >
+              <Box sx={modalStyle}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">Regional Scale Configuration</Typography>
+                  <IconButton onClick={() => setRegionalScaleModalOpen(false)} size="small">
+                    <CloseIcon />
+                  </IconButton>
+                </Box>
+
+                <Grid container spacing={3}>
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Total Number of Regions"
+                      type="number"
+                      value={totalRegions}
+                      onChange={(e) => setTotalRegions(Math.max(1, parseInt(e.target.value) || 1))}
+                      inputProps={{ min: 1 }}
+                    />
+                  </Grid>
+                </Grid>
+
+                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button
+                    variant="contained"
+                    onClick={() => setRegionalScaleModalOpen(false)}
+                  >
+                    Save Configuration
                   </Button>
                 </Box>
               </Box>
@@ -2920,6 +3125,133 @@ function CostCalculator() {
                 </Grid>
 
                 <CostDetailModal />
+              </Box>
+            )}
+
+            {regionalScaleEnabled && (
+              <Box sx={{ mt: 4 }}>
+                <Typography variant="h6" gutterBottom>
+                  Multi-Region Cost Breakdown
+                </Typography>
+                
+                {/* 1. Region-based Infrastructure Costs */}
+                <Paper sx={{ p: 2, mb: 2 }}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    1. Region-based Infrastructure Costs (× {totalRegions} regions)
+                  </Typography>
+                  <List>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Caching" 
+                        secondary={formatCurrency(getMultiRegionCosts().caching || 0)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="API & Load Balancing" 
+                        secondary={formatCurrency(getMultiRegionCosts().loadBalancer || 0)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Security Tools" 
+                        secondary={formatCurrency(getMultiRegionCosts().securityTools || 0)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="AWS Cloud Infrastructure" 
+                        secondary={formatCurrency(getMultiRegionCosts().awsCloudInfra?.total || 0)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary={<Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Subtotal</Typography>}
+                        secondary={<Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(getMultiRegionCosts().total.regionBased || 0)}</Typography>}
+                      />
+                    </ListItem>
+                  </List>
+                </Paper>
+
+                {/* 2. Network Load-based Costs */}
+                <Paper sx={{ p: 2, mb: 2 }}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    2. Network Load-based Costs (Global)
+                  </Typography>
+                  <List>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Network Data Load" 
+                        secondary={formatCurrency(getMultiRegionCosts().networkDataLoad || 0)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Storage" 
+                        secondary={formatCurrency(getMultiRegionCosts().storage || 0)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Containers" 
+                        secondary={formatCurrency(getMultiRegionCosts().containers || 0)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Network" 
+                        secondary={formatCurrency(getMultiRegionCosts().network || 0)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Monitoring" 
+                        secondary={formatCurrency(getMultiRegionCosts().monitoring || 0)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary={<Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Subtotal</Typography>}
+                        secondary={<Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(getMultiRegionCosts().total.networkLoad || 0)}</Typography>}
+                      />
+                    </ListItem>
+                  </List>
+                </Paper>
+
+                {/* 3. Region Scale-based Costs */}
+                <Paper sx={{ p: 2, mb: 2 }}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    3. Region Scale-based Costs (Global)
+                  </Typography>
+                  <List>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Infrastructure Management" 
+                        secondary={formatCurrency(getMultiRegionCosts().infrastructureManagement || 0)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary="Container Management" 
+                        secondary={formatCurrency(getMultiRegionCosts().containerManagement || 0)}
+                      />
+                    </ListItem>
+                    <ListItem>
+                      <ListItemText 
+                        primary={<Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Subtotal</Typography>}
+                        secondary={<Typography sx={{ fontWeight: 'bold' }}>{formatCurrency(getMultiRegionCosts().total.regionScale || 0)}</Typography>}
+                      />
+                    </ListItem>
+                  </List>
+                </Paper>
+                {/* Total Multi-Region Monthly Cost */}
+                <Box sx={{ mt: 4, mb: 4 }}>
+                  <Paper sx={{ p: 3, bgcolor: '#2196f3', color: 'white', boxShadow: 3 }}>
+                    <Typography variant="h5" align="center" sx={{ fontWeight: 'bold' }}>
+                      Total Multi-Region Monthly Cost: {formatCurrency(getMultiRegionCosts().total.overall || 0)}
+                    </Typography>
+                  </Paper>
+                </Box>
               </Box>
             )}
           </Box>
